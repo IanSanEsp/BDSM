@@ -1,0 +1,8 @@
+{
+  "name": "bdsm",
+  "version": "1.0.0",
+  "description": "Proyecto web BDSM",
+  "scripts": {
+    "start": "cd backend && npm install && npm start"
+  }
+}
