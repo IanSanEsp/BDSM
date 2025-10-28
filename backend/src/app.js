@@ -21,7 +21,7 @@ app.use(express.json());
 app.use("/api/usuarios", usuarioRoutes);
 
 app.get("/", (req, res) => {
-  res.send("🚀 API BTZMAP funcionando correctamente");
+  res.send("API BDSM funcionando");
 });
 
 const PORT = process.env.PORT || 3000;
