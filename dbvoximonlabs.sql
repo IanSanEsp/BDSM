@@ -53,3 +53,6 @@ create table horario_grupo (
     foreign key (id_grupo) references grupo(id_grupo),
     foreign key (id_salon) references salon(id_salon)
 );
+
+ALTER TABLE usuario
+  MODIFY contrasena VARCHAR(60) NOT NULL;

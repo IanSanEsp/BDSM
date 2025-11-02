@@ -10,4 +10,4 @@ export const db = await mysql.createConnection({
   port: process.env.DB_PORT || 3306
 });
 
-console.log("✅ Conectado a MySQL correctamente");
+console.log("Conectado a MySQL correctamente");

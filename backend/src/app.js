@@ -10,8 +10,9 @@ const app = express();
 // Configura CORS
 app.use(cors({
   origin: [
-    "https://bdsm-seven.vercel.app",       // dominio en Vercel
-    "http://localhost:5500"            // para pruebas locales
+    "https://bdsm-seven.vercel.app",     // dominio vercel
+    "http://localhost:5500",              // Live Server (localhost)
+    "http://127.0.0.1:5500"               // Live Server (127.0.0.1)
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
