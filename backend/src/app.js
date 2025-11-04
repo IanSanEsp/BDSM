@@ -3,11 +3,12 @@ import express from "express";
 import dotenv from "dotenv";
 import { db } from "./config/db.js";
 import usuarioRoutes from "./routes/usuarios.js";
+import salonRoutes from "./routes/salones.js";
 
 dotenv.config();
 const app = express();
 
-// Configura CORS
+// Configuracion CORS
 app.use(cors({
   origin: [
     "https://bdsm-seven.vercel.app",     // dominio vercel
@@ -20,6 +21,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use("/api/usuarios", usuarioRoutes);
+app.use("/api/salones", salonRoutes);
 
 app.get("/", (req, res) => {
   res.send("API BDSM funcionando");

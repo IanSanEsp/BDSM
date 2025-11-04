@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pruebas | Login</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .container { max-width: 720px; margin: 24px auto; padding: 0 12px; }
+    .card { background:#fff; padding:16px 18px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.06); margin-bottom:16px; }
+    .title { margin:0 0 8px; color:#0f172a; }
+    .field { display:flex; flex-direction:column; gap:6px; margin-bottom: 12px; }
+    label { font-weight:600; color:#0f172a; }
+    input { padding:10px; border:1px solid #cbd5e1; border-radius:6px; }
+    button { background:#10b981; color:#fff; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
+    a.btn { display:inline-block; padding:8px 12px; background:#475569; color:#fff; text-decoration:none; border-radius:6px; }
+    .message { margin-top:8px; }
+    .success { color:#1a7f37; }
+    .error { color:#d32f2f; }
+    code { background:#f1f5f9; padding:2px 4px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p><a class="btn" href="index.html">← Volver al inicio</a></p>
+
+    <div class="card">
+      <h2 class="title">Login (pruebas)</h2>
+      <form id="formLogin">
+        <div class="field">
+          <label for="correo">Correo</label>
+          <input id="correo" name="correo" type="email" required />
+        </div>
+        <div class="field">
+          <label for="contrasena">Contraseña</label>
+          <input id="contrasena" name="contrasena" type="password" required />
+        </div>
+        <button type="submit" id="btnLogin">Iniciar sesión</button>
+        <p id="msgLogin" class="message" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 class="title">Resultado</h3>
+      <p>Token (si el backend lo emite):</p>
+      <pre id="tokenBox" style="white-space:pre-wrap; word-break:break-all; background:#0b1020; color:#e5e7eb; padding:10px; border-radius:8px; overflow:auto;"></pre>
+      <p>Usuario:</p>
+      <pre id="userBox" style="white-space:pre-wrap; background:#0b1020; color:#e5e7eb; padding:10px; border-radius:8px; overflow:auto;"></pre>
+    </div>
+  </div>
+
+  <script src="test-login.js"></script>
+</body>
+</html>
