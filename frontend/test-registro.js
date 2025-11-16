@@ -1,8 +1,9 @@
 'use strict';
 
 // Cambia esta base si pruebas en local o en producción
-//const API_BASE = "http://localhost:3000";
-const API_BASE = "https://bdsm-production-0032.up.railway.app";
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://bdsm-production-0032.up.railway.app';
 
 const btnUsuarios = document.getElementById('btnUsuarios');
 const lista = document.getElementById('listaUsuarios');

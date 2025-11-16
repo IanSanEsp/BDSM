@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Solo admins (público para pruebas)
+// Solo admins
 router.get("/", listarSalones);
 router.post("/", requireAuth, requireAdmin, crearSalon);
 

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pruebas | Horarios (admin)</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .container { max-width:900px; margin:20px auto; padding:12px; }
+    .card { background:#fff;padding:14px;border-radius:10px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .field{display:flex;flex-direction:column;margin-bottom:8px}
+    label{font-weight:600}
+    input,select{padding:8px;border-radius:6px;border:1px solid #cbd5e1}
+    button{padding:8px 12px;border-radius:8px;background:#6366f1;color:#fff;border:none}
+    pre{background:#0b1020;color:#e5e7eb;padding:10px;border-radius:8px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .small{width:160px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p><a href="index.html">← Volver</a></p>
+
+    <div class="card">
+      <h2>Crear horario (admin)</h2>
+      <form id="formHorario">
+        <div class="field">
+          <label for="token">Token JWT (se toma de localStorage si existe)</label>
+          <input id="token" placeholder="token" />
+        </div>
+        <div class="row">
+          <div class="field small">
+            <label for="grupo_nombre">Nombre del grupo</label>
+            <input id="grupo_nombre" type="text" placeholder="Ej: 5A" required />
+          </div>
+          <div class="field small">
+            <label for="asignatura_nombre">Nombre de la asignatura</label>
+            <input id="asignatura_nombre" type="text" placeholder="Ej: Matemáticas" required />
+          </div>
+          <div class="field small">
+            <label for="dia">Día</label>
+            <select id="dia" required>
+              <option value="">Seleccione</option>
+              <option>Lunes</option>
+              <option>Martes</option>
+              <option>Miércoles</option>
+              <option>Jueves</option>
+              <option>Viernes</option>
+            </select>
+          </div>
+          <div class="field small">
+            <label for="hora_inicio">Hora inicio (HH:MM)</label>
+            <input id="hora_inicio" placeholder="09:00" required />
+          </div>
+          <div class="field small">
+            <label for="hora_fin">Hora fin (HH:MM)</label>
+            <input id="hora_fin" placeholder="10:30" required />
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <button id="btnCrear" type="submit">Crear horario</button>
+          <span id="msg" style="margin-left:12px"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Horarios</h3>
+      <button id="btnListar">Cargar horarios</button>
+      <div id="lista"></div>
+    </div>
+  </div>
+
+  <script>
+    window.API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : 'https://bdsm-production-0032.up.railway.app';
+  </script>
+  <script src="test-horarios.js"></script>
+</body>
+</html>

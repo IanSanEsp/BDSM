@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pruebas | Asignar salón</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .container{max-width:900px;margin:20px auto;padding:12px}
+    .card{background:#fff;padding:14px;border-radius:10px;margin-bottom:12px}
+    .field{display:flex;flex-direction:column;margin-bottom:8px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    input,select{padding:8px;border-radius:6px;border:1px solid #cbd5e1}
+    button{padding:8px 12px;border-radius:8px;background:#6366f1;color:#fff;border:none}
+    pre{background:#0b1020;color:#e5e7eb;padding:10px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p><a href="index.html">← Volver</a></p>
+    <div class="card">
+      <h2>Asignar salón a un horario</h2>
+      <div class="field">
+        <label for="token">Token JWT (se toma de localStorage si existe)</label>
+        <input id="token" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="dia">Día</label>
+          <select id="dia">
+            <option value="">Seleccione</option>
+            <option>Lunes</option>
+            <option>Martes</option>
+            <option>Miércoles</option>
+            <option>Jueves</option>
+            <option>Viernes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="bloque">Bloque horario (07:00 - 20:50)</label>
+          <select id="bloque">
+            <option value="">Seleccione</option>
+            <!-- Bloques desde 07:00 hasta 20:00, cada bloque de 50 minutos -->
+            <option value="07:00|07:50">07:00 - 07:50</option>
+            <option value="08:00|08:50">08:00 - 08:50</option>
+            <option value="09:00|09:50">09:00 - 09:50</option>
+            <option value="10:00|10:50">10:00 - 10:50</option>
+            <option value="11:00|11:50">11:00 - 11:50</option>
+            <option value="12:00|12:50">12:00 - 12:50</option>
+            <option value="13:00|13:50">13:00 - 13:50</option>
+            <option value="14:00|14:50">14:00 - 14:50</option>
+            <option value="15:00|15:50">15:00 - 15:50</option>
+            <option value="16:00|16:50">16:00 - 16:50</option>
+            <option value="17:00|17:50">17:00 - 17:50</option>
+            <option value="18:00|18:50">18:00 - 18:50</option>
+            <option value="19:00|19:50">19:00 - 19:50</option>
+            <option value="20:00|20:50">20:00 - 20:50</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="salon">Salón a asignar</label>
+          <select id="salon"></select>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <button id="btnBuscar">Buscar horarios</button>
+        <span id="msg" style="margin-left:12px"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Horarios que coinciden con el bloque</h3>
+      <div id="lista"></div>
+    </div>
+  </div>
+
+  <script>
+    window.API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : 'https://bdsm-production-0032.up.railway.app';
+  </script>
+  <script src="test-assign-salon.js"></script>
+</body>
+</html>

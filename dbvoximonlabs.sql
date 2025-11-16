@@ -56,3 +56,17 @@ create table horario_grupo (
 
 ALTER TABLE usuario
   MODIFY contrasena VARCHAR(60) NOT NULL;
+
+
+ALTER TABLE horario_grupo
+    ADD COLUMN id_materia INT NULL;
+
+DROP TABLE IF EXISTS grupo_materia;
+CREATE TABLE grupo_materia (
+    id int primary key auto_increment,
+    id_grupo int not null,
+    id_materia int not null,
+    foreign key (id_grupo) references grupo(id_grupo),
+    foreign key (id_materia) references materia(id_materia),
+    UNIQUE KEY uniq_grupo_materia (id_grupo, id_materia)
+);

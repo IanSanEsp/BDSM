@@ -116,7 +116,7 @@ export const loginUsuario = async (req, res) => {
 
     let isValid = false;
 
-    //bcrypt si parece un hash bcrypt ($2a/$2b/$2y)
+    //bcrypt si es hash bcrypt ($2a/$2b/$2y)
     if (stored.startsWith("$2")) {
       const pepper = process.env.PASSWORD_PEPPER || "";
       isValid = await bcrypt.compare(`${contrasena}${pepper}`, stored);

@@ -3,7 +3,9 @@
 // Requires CORS to allow your frontend origin. Ensure backend has 127.0.0.1:5500/localhost:5500 allowed.
 
 //const API_BASE = window.API_BASE || 'http://localhost:3000';
-const API_BASE = window.API_BASE || 'https://bdsm-production-0032.up.railway.app';
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://bdsm-production-0032.up.railway.app';
 
 const $ = (sel) => document.querySelector(sel);
 const msg = (el, text, cls) => { el.textContent = text; el.className = `message ${cls||''}`; };
