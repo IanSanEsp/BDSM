@@ -22,7 +22,7 @@ async function cargarSalones() {
     const items = data.salones || data || [];
     salonSel.innerHTML = '<option value="">Seleccione</option>';
     items.forEach(s => {
-      const o = document.createElement('option'); o.value = s.id_salon; o.textContent = `${s.nombre} (${s.piso} - ${s.tipo})`;
+      const o = document.createElement('option'); o.value = s.id_salon; o.textContent = `${s.nombre} (${s.piso} - ${s.tipo}) — ${s.estado || 'N/A'}`;
       salonSel.appendChild(o);
     });
   } catch (err) {

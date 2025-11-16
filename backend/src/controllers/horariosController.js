@@ -111,8 +111,8 @@ export const crearHorario = async (req, res) => {
     const hiSQL = toTimeWithSeconds(hi);
     const hfSQL = toTimeWithSeconds(hf);
 
-    // Control de colisiones:
-    // Un mismo grupo no puede tener dos horarios que se solapen el mismo día.
+    // Control de colisiones
+    // Mismo grupo no puede tener dos horarios que se solapen el mismo día.
     const [collisionGroup] = await db.query(
       `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_grupo = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
       [id_grupo, dia, hiSQL, hfSQL]
@@ -121,7 +121,7 @@ export const crearHorario = async (req, res) => {
       return res.status(409).json({ error: 'Colisión: el grupo ya tiene horario que se solapa en ese día' });
     }
 
-    // Si se especifica salón, ese salón no puede tener otro horario que se solape el mismo día.
+    // Salón no puede tener otro horario que se solape el mismo día.
     if (id_salon) {
       const [collisionSalon] = await db.query(
         `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
@@ -225,7 +225,7 @@ export const asignarSalon = async (req, res) => {
     const [sRows] = await db.query('SELECT id_salon FROM salon WHERE id_salon = ? LIMIT 1', [id_salon]);
     if (!sRows || sRows.length === 0) return res.status(400).json({ error: 'Salón no encontrado' });
 
-    // colisión en salón: otro horario asignado al mismo salón en el mismo día y que se solape
+    // colisión en salón con horarios
     const [colRows] = await db.query(
       `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND id_horario != ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
       [id_salon, h.dia, id, h.hora_inicio, h.hora_fin]
@@ -247,7 +247,35 @@ export const asignarSalon = async (req, res) => {
       [id]
     );
 
-    return res.json({ message: 'Salón asignado', horario: updated && updated[0] ? updated[0] : null });
+    const horario = updated && updated[0] ? updated[0] : null;
+
+    // Actualizar estado del salón por hora actual
+    try {
+      const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+      const now = new Date();
+      const diaHoy = dias[now.getDay()];
+      const pad = (n) => String(n).padStart(2, '0');
+      const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+      // Verificar horario para salón
+      const [activeRows] = await db.query(
+        `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND hora_inicio <= ? AND hora_fin > ?`,
+        [id_salon, diaHoy, horaActual, horaActual]
+      );
+      const ocupado = activeRows && activeRows[0] && activeRows[0].cnt > 0;
+      const nuevoEstado = ocupado ? 'Ocupado' : 'Disponible';
+
+      await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', [nuevoEstado, id_salon]);
+
+      // devolver el salón estado actualizado
+      const [salRows] = await db.query('SELECT * FROM salon WHERE id_salon = ? LIMIT 1', [id_salon]);
+      const salonActualizado = salRows && salRows[0] ? salRows[0] : null;
+
+      return res.json({ message: 'Salón asignado', horario, salon: salonActualizado });
+    } catch (err2) {
+      console.error('Error actualizando estado de salón:', err2);
+      return res.json({ message: 'Salón asignado', horario });
+    }
   } catch (err) {
     console.error('Error en asignarSalon:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
