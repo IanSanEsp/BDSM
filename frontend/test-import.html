@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prueba Importar Horarios</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Importar Horarios</h1>
+  <p>Sube un JSON o usa el archivo de `Exportacion_datos` en el servidor.</p>
+
+  <label>Cargar archivo JSON local: <input id="file" type="file" accept="application/json" /></label>
+  <div style="margin-top:8px;">
+    <label>Token admin (Bearer): <input id="token" style="width:60%" placeholder="Ingresa JWT admin aquí" /></label>
+  </div>
+  <div style="margin-top:8px;">
+    <button id="btnImportFile">Importar archivo seleccionado</button>
+    <button id="btnImportServer">Importar desde servidor (archivo Exportacion_datos)</button>
+  </div>
+
+  <pre id="output" style="white-space:pre-wrap;background:#f3f4f6;padding:12px;border-radius:6px;margin-top:12px;"></pre>
+  <p><a href="index.html">Volver</a></p>
+  <script src="test-import.js"></script>
+</body>
+</html>
