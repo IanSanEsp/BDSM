@@ -1,4 +1,6 @@
-const API_BASE = window.API_BASE || 'http://localhost:3000';
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://bdsm-production-0032.up.railway.app';
 
 const $ = (s) => document.querySelector(s);
 const tokenInput = $('#token');
