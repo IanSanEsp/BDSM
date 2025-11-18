@@ -1,0 +1,33 @@
+{
+  "salones": {
+    "SinAsignar": [
+      {
+        "materia": "LDS",
+        "hora": "13:00 - 15:00",
+        "profesor": "-"
+      },
+      {
+        "materia": "Programación web",
+        "hora": "14:00 - 15:00",
+        "profesor": "-"
+      },
+      {
+        "materia": "Programación web",
+        "hora": "14:00 - 15:00",
+        "profesor": "-"
+      }
+    ],
+    "salon1": [
+      {
+        "materia": "Programación movil",
+        "hora": "12:00 - 14:00",
+        "profesor": "-"
+      },
+      {
+        "materia": "Calculo",
+        "hora": "13:00 - 15:00",
+        "profesor": "-"
+      }
+    ]
+  }
+}

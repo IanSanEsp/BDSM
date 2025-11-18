@@ -1,10 +1,12 @@
 import cors from "cors";
 import express from "express";
 import dotenv from "dotenv";
+import path from "path";
 import { db } from "./config/db.js";
 import usuarioRoutes from "./routes/usuarios.js";
 import salonRoutes from "./routes/salones.js";
 import horarioRoutes from "./routes/horarios.js";
+import importExportRoutes from "./routes/importExport.js";
 
 dotenv.config();
 const app = express();
@@ -24,6 +26,7 @@ app.use(express.json());
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/salones", salonRoutes);
 app.use("/api/horarios", horarioRoutes);
+app.use("/api/data", importExportRoutes);
 
 app.get("/", (req, res) => {
   res.send("API BDSM funcionando");
