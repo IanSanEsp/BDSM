@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AdminMain</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&family=Kanit:wght@300;400;500;600&family=Open+Sans:w@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/header.css">
+  <link rel="stylesheet" href="assets/css/sidebar.css">
+  <link rel="stylesheet" href="assets/css/user-section.css">
+  <link rel="stylesheet" href="assets/css/footer.css">
+  <link rel="stylesheet" href="assets/css/ui-messages.css">
+
+  <!-- Page CSS -->
+  <link rel="stylesheet" href="assets/css/map-admin.css">
+
+
+</head>
+<body class="layout">
+
+  <!-- header -->
+  <header class="header"><div class="header-logo">LOGO</div></header>
+
+  <!-- sidebar -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <nav>
+      <a href="btzAdmin-Main.html" class="item"><span class="icon">🏠</span><span class="label">Main</span></a>
+      <hr>
+      <a href="btzMap-adminMap.html" class="item"><span class="icon">🗺️</span><span class="label">Mapa de Navegación</span></a>
+      <hr>
+      <a href="btzMap-adminUsr.html" class="item"><span class="icon">👥</span><span class="label">Usuarios</span></a>
+      <hr>
+      <a href="btzMap-adminMng.html" class="item"><span class="icon">🏫</span><span class="label">Salones</span></a>
+      <hr>
+      <a href="btzMap-adminMng.html" class="item"><span class="icon">⏰</span><span class="label">Horarios</span></a>
+      <hr>
+      <a href="btzMap-adminStts.html" class="item"><span class="icon">⚙️</span><span class="label">Ajustes</span></a>
+    </nav>
+  </aside>
+
+<div class="user-section">
+  <div class="user-left">
+      <span class="label">Usuario</span>
+
+      <div class="user-info-row">
+          <span class="user-name">Juan Pérez</span>
+          <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+      </div>
+  </div>
+
+  <div class="user-right">
+      <span class="clock-label">Hora</span>
+      <span class="clock" id="clock">--:--</span>
+  </div>
+</div>
+
+
+ <main class="content">
+
+<!-- MAPA -->
+<div class="map-wrapper">
+
+    <div class="map-background"></div>
+
+    <div class="map-display">
+
+        <!-- FRAME -->
+        <div class="map-frame" id="mapContainer">
+
+            <div class="map-loading" id="mapLoading">
+                <div class="spinner"></div>
+            </div>
+
+            <div id="mapInner">
+                <!-- Esto ya esta c: -->
+            </div>
+
+        </div>
+
+        <!-- CLOCK -->
+        <div class="map-clock" id="mapClock">00:00:00</div>
+
+        <div class="map-controls">
+
+            <button class="ctrl-btn" id="openFilters">🔍</button>
+
+            <div class="floors">
+                <button class="floor-btn" id="floorDown">▲</button>
+
+                <button class="floor-item active" data-floor="0">L</button>
+                <button class="floor-item" data-floor="1">P1</button>
+                <button class="floor-item" data-floor="2">P2</button>
+                <button class="floor-item" data-floor="3">P3</button>
+
+            <button class="floor-btn" id="floorUp">▼</button>
+
+            </div>
+
+            <!-- Zoom  -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomIn">＋</button>
+                <button class="zoom-btn" id="zoomOut">－</button>
+                <button class="zoom-btn" id="zoomReset">⤾</button>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+
+<!-- FILTER MODAL -->
+<div class="filter-modal" id="filterModal">
+
+    <div class="filter-card">
+
+        <div class="filter-header">
+            <h2>Filtros</h2>
+            <button class="close-filter" id="closeFilters">✕</button>
+        </div>
+
+        <hr>
+
+        <div class="filter-grid">
+            <select id="filterSalon"><option value="">Seleccionar salón</option></select>
+            <select id="filterGrupo"><option value="">Seleccionar grupo</option></select>
+            <select id="filterMateria"><option value="">Seleccionar materia</option></select>
+            <select id="filterProfesor"><option value="">Seleccionar profesor</option></select>
+            <input id="filterStart" type="time" placeholder="Periodo inicio" />
+            <input id="filterEnd" type="time" placeholder="Periodo fin" />
+        </div>
+
+        <div class="filter-footer">
+            <button class="confirm-btn" id="filterConfirm">Confirmar</button>
+        </div>
+
+    </div>
+</div>
+
+</main>
+
+
+  <footer class="footer">
+    <div class="footer-left">Panel de Administración<br>CECyT 9 — IPN</div>
+    <div class="footer-right">v1.0.0</div>
+  </footer>
+
+  <!-- scripts -->
+  <script src="assets/js/clock.js"></script>
+  <script src="assets/js/map-admin-map.js" defer></script>
+    <script src="assets/js/session-user.js"></script>
+  <script src="assets/js/logout.js"></script>
+    
+  <!-- scripts mapa -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dxf@4.3.0/dist/dxf.min.js"></script>
+  <script src="assets/js/dxf-integration.js" defer></script>
+  <script src="https://unpkg.com/three@0.126.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three-dxf@0.2.0/dist/dxf.min.js"></script> 
+
+</body>
+</html>

@@ -1,0 +1,16 @@
+/* Styles for schedule,  rows and import */
+:root{ --mng-field-height:40px; --mng-btn-size:32px; }
+.mng-upper{ display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+.mng-btn{ background:var(--guinda); color:var(--white); padding:8px 14px; border-radius:6px; border:none; cursor:pointer; font-weight:600; }
+.mng-btn.secondary{ background:var(--guinda-soft); color:var(--guinda); }
+.mng-btn.secondary.active{ background:var(--guinda-light); color:var(--white); }
+.mng-import{ width:100%; max-width:880px; height:110px; background: rgba(233,214,223,0.28); border-radius:10px; display:flex; align-items:center; justify-content:center; border:2px dashed rgba(161,54,90,0.28); color:var(--guinda); cursor:pointer; }
+.mng-import.drag-over{ background: rgba(161,54,90,0.5); border-color: var(--guinda); }
+.import-inner{ text-align:center; }
+#rowContainer{ max-height:55vh; overflow-y:auto; padding-right:6px; }
+.mng-row{ display:grid; grid-template-columns:120px 1fr 140px 110px 100px 100px 80px; gap:12px; margin-bottom:10px; align-items:center; min-height:calc(var(--mng-field-height)); }
+.mng-row input,.mng-row select{ width:100%; min-width:80px; height:var(--mng-field-height); padding:6px 12px; border-radius:6px; border:none; background:var(--white); color:#333; font-weight:600; box-sizing:border-box; }
+.row-controls{ display:flex; flex-direction:row; gap:8px; align-items:center; justify-content:center; align-self:center; }
+.row-add,.row-remove{ width:var(--mng-btn-size); height:var(--mng-btn-size); border-radius:8px; border:none; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.18); background:var(--white); color:var(--guinda); display:inline-flex; align-items:center; justify-content:center; align-self:center; }
+.row-remove{ color:var(--guinda-light); }
+@media (max-width:820px){ .mng-row{ grid-template-columns:1fr 1fr; } .row-controls{ flex-direction:row; } }

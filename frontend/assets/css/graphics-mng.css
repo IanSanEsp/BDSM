@@ -1,0 +1,8 @@
+:root{ --guinda:#8A2041; --guinda-light:#A1365A; --guinda-soft:#E9D6DF; --soft-bg:#F6E8EE; --white:#ffffff; }
+.editor-top{ margin-bottom:12px; }
+.period-strip{ display:flex; gap:6px; align-items:center; }
+.editor-legend{ display:flex; flex-direction:column; gap:8px; }
+.dot{ display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+.dot.available{ background:#2ecc71; }
+.dot.occupied{ background:#e74c3c; }
+.dot.maint{ background:#f39c12; }

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AdminMain</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&family=Kanit:wght@300;400;500;600&family=Open+Sans:w@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Page CSS -->
+  <link rel="stylesheet" href="assets/css/login.css">
+  <link rel="stylesheet" href="assets/css/ui-messages.css">
+
+</head>
+<body class="layout">
+
+  <!-- header -->
+  <header class="header"><div class="header-logo">LOGO</div></header>
+
+  <!-- main -->
+  <main class="content">
+
+    <div class="login-wrapper">
+
+      <div class="login-tabs">
+          <button id="tab-user" class="active">Usuario</button>
+          <button id="tab-admin">Administrador</button>
+      </div>
+
+      <div class="login-card">
+          <h2 id="login-title">Login Usuario</h2>
+
+          <form id="login-form">
+              <input id="email-input" type="email" placeholder="Correo Electrónico" required>
+              <input id="password-input" type="password" placeholder="Contraseña" required>
+              <button type="submit" class="login-btn">Entrar</button>
+          </form>
+
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-left">Panel de Administración<br>CECyT 9 — IPN</div>
+    <div class="footer-right">v1.0.0</div>
+  </footer>
+
+  <!-- UI Messages -->
+  <script src="assets/js/ui-messages.js"></script>
+
+<script>
+// Login real contra el backend
+document.addEventListener("DOMContentLoaded", () => {
+    const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+        ? "http://localhost:3000"
+        : "https://bdsm-production-0032.up.railway.app";
+
+    const loginForm = document.getElementById("login-form");
+    const loginTypeUser = document.getElementById("tab-user");
+    const loginTypeAdmin = document.getElementById("tab-admin");
+    const title = document.getElementById("login-title");
+
+    let currentType = "user";
+
+    function show(type, msg, ms = 3000) {
+        if (window.UI && window.UI.showBanner) return window.UI.showBanner(type, msg, ms);
+        alert(msg);
+    }
+
+    const isAdminTipo = (t) => {
+        const v = String(t || "").toLowerCase();
+        return v === "admin" || v === "administrador" || v === "adminisrtrador";
+    };
+
+    loginTypeUser.addEventListener("click", () => {
+        currentType = "user";
+        loginTypeUser.classList.add("active");
+        loginTypeAdmin.classList.remove("active");
+        title.innerText = "Login Usuario";
+    });
+
+    loginTypeAdmin.addEventListener("click", () => {
+        currentType = "admin";
+        loginTypeAdmin.classList.add("active");
+        loginTypeUser.classList.remove("active");
+        title.innerText = "Login Administrador";
+    });
+
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const correo = document.getElementById("email-input").value.trim();
+        const contrasena = document.getElementById("password-input").value.trim();
+        if (!correo || !contrasena) {
+            show('error', 'Ingresa correo y contraseña');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/api/usuarios/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ correo, contrasena })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+
+            const usuario = data.usuario || {};
+            const token = data.token || '';
+            const esAdmin = isAdminTipo(usuario.tipo_user);
+
+            // Si el usuario eligió pestaña admin y no es admin, bloquear
+            if (currentType === 'admin' && !esAdmin) {
+                show('error', 'La cuenta no tiene rol administrador.');
+                return;
+            }
+
+            // Guardar token y datos mínimos
+            try {
+                localStorage.setItem('token', token);
+                localStorage.setItem('usuario', JSON.stringify(usuario));
+            } catch (err) {
+            }
+
+            show('success', 'Login correcto', 1000);
+
+            // Redirigir según rol
+            if (esAdmin) {
+                window.location.href = 'btzAdmin-Main.html';
+            } else {
+                window.location.href = 'btzUser-Main.html';
+            }
+        } catch (err) {
+            show('error', err.message || 'Error al iniciar sesión');
+        }
+    });
+});
+</script>
+
+</body>
+</html>

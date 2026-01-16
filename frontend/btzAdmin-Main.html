@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AdminMain</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&family=Kanit:wght@300;400;500;600&family=Open+Sans:w@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/header.css">
+  <link rel="stylesheet" href="assets/css/sidebar.css">
+  <link rel="stylesheet" href="assets/css/user-section.css">
+  <link rel="stylesheet" href="assets/css/footer.css">
+  <link rel="stylesheet" href="assets/css/ui-messages.css">
+
+  <!-- Page CSS -->
+  <link rel="stylesheet" href="assets/css/left-admin.css">
+  <link rel="stylesheet" href="assets/css/right-admin.css">
+
+</head>
+<body class="layout">
+
+  <!-- header -->
+  <header class="header"><div class="header-logo">LOGO</div></header>
+
+  <!-- sidebar -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <nav>
+      <a href="btzAdmin-Main.html" class="item"><span class="icon">🏠</span><span class="label">Main</span></a>
+      <hr>
+      <a href="btzMap-adminMap.html" class="item"><span class="icon">🗺️</span><span class="label">Mapa de Navegación</span></a>
+      <hr>
+      <a href="btzMap-adminUsr.html" class="item"><span class="icon">👥</span><span class="label">Usuarios</span></a>
+      <hr>
+      <a href="btzMap-adminMng.html" class="item"><span class="icon">🏫</span><span class="label">Salones</span></a>
+      <hr>
+      <a href="btzMap-adminMng.html" class="item"><span class="icon">⏰</span><span class="label">Horarios</span></a>
+      <hr>
+      <a href="btzMap-adminStts.html" class="item"><span class="icon">⚙️</span><span class="label">Ajustes</span></a>
+    </nav>
+  </aside>
+
+<div class="user-section">
+  <div class="user-left">
+      <span class="label">Usuario</span>
+
+      <div class="user-info-row">
+          <span class="user-name">Juan Pérez</span>
+          <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+      </div>
+  </div>
+
+  <div class="user-right">
+      <span class="clock-label">Hora</span>
+      <span class="clock" id="clock">--:--</span>
+  </div>
+</div>
+
+
+  <!-- main -->
+  <main class="content">
+    <div class="page-wrapper">
+
+      <!-- LEFT (map) -->
+      <div class="left-column">
+        <nav class="map-topnav">
+          <a href="btzMap-adminMap.html" class="active">Mapa</a><span class="sep">|</span>
+          <a href="btzMap-adminUsr.html">Perfiles</a><span class="sep">|</span>
+          <a href="btzMap-adminMng.html">Salones & Horarios</a>
+        </nav>
+
+        <div class="map-wrapper">
+          <div class="map-display">
+            <div class="map-frame" id="mapContainer">
+              <div class="map-loading" id="mapLoading">
+                <div class="spinner"></div>
+              </div>
+              <div id="mapInner">
+                <!-- DXF viewer (cromon) -->
+              </div>
+            </div>
+          </div>
+
+          <div class="floor-slider" role="toolbar" aria-label="Cambiar piso">
+            <button id="btn-floor-left" class="slider-btn" aria-label="Anterior piso">&#9664;</button>
+            <div class="floor-options" role="tablist" aria-label="Pisos">
+              <span class="floor-option active" role="tab">Lobby</span>
+              <span class="floor-option" role="tab">Planta 1</span>
+              <span class="floor-option" role="tab">Planta 2</span>
+              <span class="floor-option" role="tab">Planta 3</span>
+            </div>
+            <button id="btn-floor-right" class="slider-btn" aria-label="Siguiente piso">&#9654;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT (rooms) -->
+      <aside class="right-column right-section" aria-label="Panel de salones">
+        <div class="rooms-top">
+          <div class="rooms-header"><h3>Salones</h3></div>
+        </div>
+
+        <div id="roomsRight" class="rooms-right-container" role="region" aria-label="Salones actuales"></div>
+
+        <div id="roomsLoading" class="rooms-loading">
+          <div class="spinner"></div>
+        </div>
+      </aside>
+      <!-- Rooms schedule modal (used by slider cards) -->
+      <div class="modal-overlay" id="roomsModal" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <div class="modal-header">
+            <div class="modal-title" id="modalTitle">Horario Salón</div>
+            <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
+          </div>
+
+          <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
+            <label style="font-weight:700;">Día:</label>
+            <select id="modalDaySelect" style="padding:6px 8px; border-radius:6px; border:1px solid rgba(0,0,0,0.08);">
+              <option value="mon">Lun</option>
+              <option value="tue">Mar</option>
+              <option value="wed">Mié</option>
+              <option value="thu">Jue</option>
+              <option value="fri">Vie</option>
+            </select>
+          </div>
+
+          <div style="max-height:60vh; overflow:auto;">
+            <table class="schedule-table" style="width:100%;">
+              <thead>
+                <tr>
+                  <th>Día</th>
+                  <th>Hora</th>
+                  <th>Grupo</th>
+                  <th>Asignatura</th>
+                  <th>Profesor</th>
+                  <th>Salón</th>
+                </tr>
+              </thead>
+              <tbody id="scheduleBody">
+                <tr><td colspan="6" class="schedule-empty">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-left">Panel de Administración<br>CECyT 9 — IPN</div>
+    <div class="footer-right">v1.0.0</div>
+  </footer>
+
+  <!-- scripts mapa -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dxf@4.3.0/dist/dxf.min.js"></script>
+  <script src="https://unpkg.com/three-dxf@0.2.0/dist/dxf.min.js"></script>
+  
+  <!-- Page Scripts -->
+  <script src="assets/js/clock.js"></script>
+  <script src="assets/js/rooms-right.js"></script>
+  <script src="assets/js/session-user.js"></script>
+  <script src="assets/js/logout.js"></script>
+  <script src="assets/js/admin-map.js"></script>
+
+  <style>
+    @keyframes slideInFloor {
+      from {
+        opacity: 0.7;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+  </style>
+
+</body>
+</html>

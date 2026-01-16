@@ -1,0 +1,149 @@
+/* Styles for the management modal and its tabs */
+.mng-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.30);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.mng-modal-overlay.show { display:flex; }
+.mng-modal { width: 1000px; max-height: 96vh; overflow: auto; background: var(--guinda); color: var(--white); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.28); padding: 14px 20px; position: relative; }
+.close-mng { position: absolute; top: 14px; right: 16px; font-size: 26px; background: none; border: none; color: var(--white); cursor: pointer; }
+.modal-divider { width: 100%; height: 2px; background: rgba(255,255,255,0.22); margin: 14px 0 20px 0; }
+.mng-modal-tabs { display: flex; gap: 10px; }
+.modal-tab { background: var(--guinda-light); border-radius: 8px; padding: 8px 14px; height: 48px; display: inline-flex; align-items: center; border: none; cursor: pointer; color: var(--white); font-weight: 600; }
+.modal-tab.active { background: var(--white); color: var(--guinda); }
+.modal-tab-content { display: none; }
+.modal-tab-content.active { display: block; }
+.mng-modal-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
+.mng-confirm { background: var(--white); color: var(--guinda); padding: 8px 16px; height: var(--mng-field-height); display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
+
+/* Password modal (used by rooms-admin.js) */
+.password-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.password-modal-card {
+  background: #F9F0F7;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 420px;
+  width: 92%;
+  box-shadow: 0 8px 24px rgba(147, 49, 92, 0.15);
+}
+.password-modal-title { color: #8A2041; font-weight:700; margin-bottom:12px; }
+.password-modal-fields { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.password-field-group label { color:#8A2041; font-weight:600; font-size:13px; }
+.password-input { padding:10px 12px; border-radius:8px; border:2px solid #A1365A; background:#fff; }
+.password-modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+.password-btn { padding:8px 14px; border-radius:8px; border:none; font-weight:700; cursor:pointer; }
+.password-btn.confirm { background:#8A2041; color:#fff; }
+.password-btn.cancel { background:#E4C9D7; color:#8A2041; }
+
+/* Animations for password modal */
+.password-modal-overlay {
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.password-modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.password-modal-card {
+  transform: scale(0.985) translateY(6px);
+  opacity: 0;
+  transition: transform 220ms cubic-bezier(.2,.9,.2,1), opacity 180ms ease;
+}
+.password-modal-card.enter {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+.password-modal-card.leave {
+  transform: scale(0.98) translateY(8px);
+  opacity: 0;
+}
+
+/* Slight focus ring for inputs when modal open */
+.password-input:focus { outline: 3px solid rgba(138,32,65,0.12); }
+
+/* Animations for management modal and generic modals */
+.mng-modal-overlay {
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.mng-modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+  display: flex; /* ensure flex when shown */
+}
+.mng-modal {
+  transform: scale(0.99) translateY(8px);
+  opacity: 0;
+  transition: transform 220ms cubic-bezier(.2,.9,.2,1), opacity 180ms ease;
+}
+.mng-modal.enter { transform: scale(1) translateY(0); opacity: 1; }
+.mng-modal.leave { transform: scale(0.985) translateY(10px); opacity: 0; }
+
+/* Generic modal-overlay / modal-card used across the app */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.18);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10050;
+  opacity: 0;
+  transition: opacity 260ms cubic-bezier(.2,.9,.2,1);
+  pointer-events: none;
+}
+.modal-overlay.show { display:flex; opacity:1; pointer-events:auto; }
+.modal-card {
+  transform: scale(0.99) translateY(8px);
+  opacity: 0;
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 200ms ease;
+  /* Visual style to match supplied design */
+  background: #F9F0F7;
+  color: var(--guinda, #8A2041);
+  border-radius: 14px;
+  padding: 20px 22px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 12px 32px rgba(138,32,65,0.09);
+  border: 1px solid rgba(138,32,65,0.06);
+}
+.modal-card.enter { transform: scale(1) translateY(0); opacity:1; }
+.modal-card.leave { transform: scale(0.985) translateY(10px); opacity:0; }
+
+/* Title and header inside modal-card */
+.modal-card h3 { margin:0; color:var(--guinda, #8A2041); font-size:20px; font-weight:800; }
+.modal-card .modal-close { background:none; border:none; font-size:16px; color:rgba(0,0,0,0.45); cursor:pointer; padding:6px 8px; border-radius:8px; }
+
+/* Inputs inside generic modal - reuse password styles look */
+.modal-card label { color:var(--guinda, #8A2041); font-weight:700; font-size:13px; margin-bottom:6px; display:block; }
+.modal-card input, .modal-card select { padding:10px 12px; border-radius:8px; border:2px solid rgba(138,32,65,0.18); background:#fff; width:100%; box-sizing:border-box; }
+.modal-card .form-fields { display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+
+/* Actions at bottom */
+.modal-card .password-btn { min-width:96px; padding:10px 14px; border-radius:10px; font-weight:700; }
+.modal-card .password-btn.confirm { background:var(--guinda, #8A2041); color:#fff; box-shadow: 0 6px 18px rgba(138,32,65,0.12); }
+.modal-card .password-btn.cancel { background:#F2DCE3; color:var(--guinda, #8A2041); }
+
+/* Slightly stronger appear animation for card */
+@keyframes modalPop {
+  from { transform: translateY(12px) scale(.99); opacity:0 }
+  to { transform: translateY(0) scale(1); opacity:1 }
+}
+.modal-card.enter { animation: modalPop 260ms cubic-bezier(.2,.9,.2,1) both; }
+
+/* groups-modal often uses .modal-overlay + .modal-card.large — ensure animations apply */
+.groups-modal .modal-card.large { max-width: 900px; }

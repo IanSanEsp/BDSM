@@ -1,0 +1,107 @@
+.map-topnav {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 0 20px 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-start;
+  gap: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--guinda);
+}
+.map-topnav a { text-decoration:none; color:var(--guinda); opacity:.8; transition:opacity .2s; }
+.map-topnav a:hover{ opacity:1; }
+.map-topnav .sep { color:#999; }
+
+.map-wrapper { width:100%; max-width:1200px; margin:0; }
+.map-display {
+  width: 100%;
+  height: 480px;
+  background: white;
+  border: 3px solid var(--guinda-light);
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+/* Map loading overlay and transitions (same feel as map-admin.css) */
+.map-frame { position: relative; width: 100%; height: 100%; }
+.map-frame.fade-out { opacity: 0; transition: opacity 0.35s ease; }
+.map-frame.fade-in { opacity: 1; transition: opacity 0.35s ease; }
+
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(249, 240, 247, 0.65);
+  backdrop-filter: blur(2px);
+  border-radius: 12px;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.map-loading.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 6px solid #E4C9D7;
+  border-top: 6px solid #8A2041;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.floor-slider {
+  background: var(--guinda);
+  color: var(--text-light);
+  height: 60px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px;
+  width: calc(100% - 20px);
+}
+.slider-btn {
+  background: transparent; border: none; font-size: 26px; color: var(--text-light);
+  cursor: pointer; padding: 0 10px; opacity: 0.85; transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.slider-btn:hover { opacity: 1; transform: scale(1.1); }
+.slider-btn:active { transform: scale(0.95); }
+.floor-options { display:flex; gap:40px; font-size:18px; }
+.floor-option { 
+  cursor:pointer; 
+  opacity:.7; 
+  transition: opacity 0.3s ease, font-weight 0.2s ease, transform 0.3s ease;
+  color: var(--text-light);
+}
+.floor-option:hover{ 
+  opacity:1; 
+  transform: translateY(-2px);
+}
+.floor-option.active { 
+  font-weight:700; 
+  opacity:1;
+  animation: slideInFloor 0.3s ease;
+}
+
+@keyframes slideInFloor {
+  from {
+    opacity: 0.7;
+    transform: scale(0.95) translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

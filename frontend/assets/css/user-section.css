@@ -1,0 +1,81 @@
+.user-section {
+  position: fixed;
+  top: calc(var(--header-height) + 10px);
+  left: 18px;
+  right: 28px;
+  height: 78px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 90;
+  border-left: 10px solid var(--guinda);
+  font-family: var(--font-primary);
+  color: #222;
+}
+
+/* LEFT SIDE ORGANIZATION */
+.user-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.user-info-row {
+  display: flex;
+  align-items: center;
+  gap: 14px; 
+}
+
+.label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.user-name {
+  font-size: 26px;
+  font-weight: 600;
+  color: #222;
+}
+
+.user-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.clock-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.clock {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--guinda);
+}
+
+/* LOGOUT BUTTON */
+.logout-btn {
+  padding: 6px 14px;
+  background: var(--guinda);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.2s ease;
+}
+
+.logout-btn:hover {
+  background: var(--guinda-mid);
+}
+
+.logout-btn:active {
+  background: var(--guinda-light);
+}

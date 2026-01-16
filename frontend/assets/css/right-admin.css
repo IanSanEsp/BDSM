@@ -1,0 +1,128 @@
+.right-section {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* semester header */
+.semester-block { width: 100%; }
+.semester-title {
+  font-size: 20px; font-weight: 700; color: var(--guinda); margin-bottom: 12px;
+}
+
+/* slider block per floor */
+.slider-block { margin-bottom: 18px; }
+.slider-block.highlight { box-shadow: 0 8px 22px rgba(138,32,65,0.08); border-radius:8px; padding:6px; }
+.slider-row-wrap { display:flex; align-items:center; gap:10px; }
+.classroom-slider { display:flex; gap:14px; padding:8px 6px; overflow-x:auto; scroll-behavior:smooth; flex:1 1 auto; }
+
+/* highlight selected floor's cards */
+.slider-block.selected-floor .classroom-card { box-shadow: 0 12px 30px rgba(138,32,65,0.12); transform: translateY(-6px); border: 1px solid rgba(138,32,65,0.06); }
+.classroom-card.selected-card { outline: 2px solid rgba(138,32,65,0.06); }
+
+/* vertical controls inside the roomsRight container */
+.rooms-vertical-controls { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index: 10; }
+.rooms-vertical-btn { width:32px; height:28px; border-radius:8px; border:none; background: rgba(0,0,0,0.06); cursor:pointer; color:#333; box-shadow: 0 6px 14px rgba(0,0,0,0.06); }
+.rooms-vertical-btn:hover { background: rgba(0,0,0,0.10); }
+
+/* rooms loading overlay (reuse map style) */
+.rooms-frame.fade-out { opacity: 0; transition: opacity 0.35s ease; }
+.rooms-frame.fade-in { opacity: 1; transition: opacity 0.35s ease; }
+
+.rooms-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(249, 240, 247, 0.65);
+  backdrop-filter: blur(2px);
+  border-radius: 12px;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.rooms-loading.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 5px solid rgba(228,201,215,0.9);
+  border-top: 5px solid #8A2041;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.rooms-header h3 { color: var(--guinda); font-size:20px; margin:0; }
+
+/* grid */
+.classroom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+/* horizontal slider variant used on main admin page */
+.rooms-slider-wrapper { display:flex; align-items:center; gap:8px; }
+.rooms-nav { background: rgba(138,32,65,0.08); border:none; font-size:20px; width:36px; height:64px; border-radius:12px; cursor:pointer; color:#6b6b6b; display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 14px rgba(138,32,65,0.06); transition: background-color .18s ease, color .12s ease, box-shadow .18s ease, transform .12s ease; }
+.rooms-nav:hover { background: rgba(138,32,65,0.16); color: #8A2041; box-shadow: 0 10px 22px rgba(138,32,65,0.14); transform: translateX(2px); }
+.rooms-nav.left:hover { transform: translateX(-2px); }
+.rooms-slider { overflow:hidden; flex:1 1 auto; }
+.rooms-internal { display:flex; gap:14px; padding:8px 6px; overflow-x:auto; scroll-behavior:smooth; }
+.classroom-card { min-width: 200px; max-width: 220px; flex:0 0 auto; }
+.room-current-class { font-size:15px; color:#222; font-weight:600; margin-top:6px; }
+.room-time { font-size:13px; color:#9e8ea0; margin-top:4px; }
+
+.classroom-card {
+  background: #fff; border-radius:12px; padding:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  position: relative; cursor:pointer;
+  transition: transform .12s, box-shadow .12s;
+  display:flex; flex-direction:column; gap:8px;
+}
+.classroom-card:hover { transform: translateY(-4px); box-shadow:0 10px 20px rgba(0,0,0,0.10); }
+
+.occupancy-line { height:6px; width:100%; border-radius:6px; margin-bottom:6px; }
+.occ-available { background: #4caf50; }    
+.occ-occupied  { background: #d62839; }    
+.occ-maint     { background: #9aa0a6; }    
+
+.room-title { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:16px; font-weight:700; color:#222; }
+.room-edit-btn { background:transparent; border:none; cursor:pointer; font-size:16px; color:var(--guinda-mid); opacity:0.9; }
+.room-meta { font-size:13px; color:#444; line-height:1.2; }
+.room-time { font-size:13px; color:#666; }
+
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:2200; }
+.modal { width:820px; max-width:calc(100% - 40px); background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 28px rgba(0,0,0,0.25); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.modal-title { font-size:20px; font-weight:700; color:var(--guinda); }
+.modal-close { cursor:pointer; font-size:18px; opacity:0.8; }
+.schedule-table { width:100%; border-collapse:collapse; font-size:14px; color:#222; }
+.schedule-table th, .schedule-table td { border:1px solid rgba(0,0,0,0.06); padding:8px; text-align:center; }
+.schedule-empty { text-align:center; padding:18px; color:#666; }
+
+@media (max-width:900px) {
+  .classroom-grid { grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
+  .modal { width:92%; }
+}
+
+.remove-btn {
+  background: #c62828;
+  border: none;
+  color: #fff;
+  padding: 2px 6px;
+  margin-left: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.remove-btn:hover {
+  background: #b71c1c;
+}

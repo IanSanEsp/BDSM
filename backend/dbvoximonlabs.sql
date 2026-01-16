@@ -70,3 +70,14 @@ CREATE TABLE grupo_materia (
     foreign key (id_materia) references materia(id_materia),
     UNIQUE KEY uniq_grupo_materia (id_grupo, id_materia)
 );
+
+-- Marcadores de salones (persistencia de señalización del mapa)
+DROP TABLE IF EXISTS salon_markers;
+CREATE TABLE salon_markers (
+    piso ENUM('1','2','3') NOT NULL,
+    id_salon CHAR(50) NOT NULL,
+    x DOUBLE NOT NULL,
+    y DOUBLE NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (piso, id_salon)
+);

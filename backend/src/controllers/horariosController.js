@@ -1,4 +1,13 @@
 import { db } from "../config/db.js";
+function splitProfesor(name) {
+  const n = String(name || '').trim();
+  if (!n) return { nombre: 'Desconocido', appat: '-', apmat: '-' };
+  const parts = n.split(/\s+/);
+  const nombre = parts[0] || 'Desconocido';
+  const appat = parts[1] || '-';
+  const apmat = parts.length > 2 ? parts.slice(2).join(' ') : '-';
+  return { nombre, appat, apmat };
+}
 
 const DIAS = new Set(["Lunes","Martes","Miércoles","Jueves","Viernes"]);
 
@@ -13,7 +22,8 @@ function toTimeWithSeconds(h) {
 
 export const crearHorario = async (req, res) => {
   try {
-    let { id_grupo, id_materia, dia, hora_inicio, hora_fin, id_salon, grupo_nombre, asignatura_nombre } = req.body || {};
+    let { id_grupo, id_materia, dia, hora_inicio, hora_fin, id_salon, grupo_nombre, asignatura_nombre, profesor, profesor_nombre } = req.body || {};
+    const profesorName = profesor_nombre || profesor || null;
 
     // Soportar enviar id_grupo/id_materia (antiguo) o enviar nombres (nuevo).
     if ((!id_grupo || !id_materia) && (!grupo_nombre || !asignatura_nombre)) {
@@ -42,19 +52,42 @@ export const crearHorario = async (req, res) => {
     // Verificar que el grupo existe y que pertenece a la materia indicada
     if ((!id_grupo || !id_materia) && (grupo_nombre && asignatura_nombre)) {
       // Buscar o crear materia
-      const [matRows] = await db.query("SELECT id_materia FROM materia WHERE sig_nombre = ? LIMIT 1", [asignatura_nombre]);
+      const [matRows] = await db.query("SELECT id_materia, id_profesor FROM materia WHERE sig_nombre = ? LIMIT 1", [asignatura_nombre]);
       let materiaId;
       if (matRows && matRows.length > 0) {
         materiaId = matRows[0].id_materia;
+        // Si se envía profesor, actualizar la materia con ese profesor (creándolo si no existe)
+        if (profesorName) {
+          // Buscar por nombre completo
+          const [profRows2] = await db.query("SELECT id_profesor FROM profesor WHERE CONCAT_WS(' ', prof_nombre, prof_appat, prof_apmat) = ? LIMIT 1", [profesorName]);
+          let profesorId2 = profRows2 && profRows2.length > 0 ? profRows2[0].id_profesor : null;
+          if (!profesorId2) {
+            const { nombre, appat, apmat } = splitProfesor(profesorName);
+            const [insProf2] = await db.query("INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)", [nombre, appat, apmat]);
+            profesorId2 = insProf2.insertId;
+          }
+          await db.query("UPDATE materia SET id_profesor = ? WHERE id_materia = ?", [profesorId2, materiaId]);
+        }
       } else {
-        // Si no hay profesor 'Desconocido'.
-        const [profRows] = await db.query("SELECT id_profesor FROM profesor LIMIT 1");
+        // Crear profesor según el nombre proporcionado o usar 'Desconocido'
         let profesorId;
-        if (profRows && profRows.length > 0) {
-          profesorId = profRows[0].id_profesor;
+        if (profesorName) {
+          const [profRowsByFull] = await db.query("SELECT id_profesor FROM profesor WHERE CONCAT_WS(' ', prof_nombre, prof_appat, prof_apmat) = ? LIMIT 1", [profesorName]);
+          if (profRowsByFull && profRowsByFull.length > 0) {
+            profesorId = profRowsByFull[0].id_profesor;
+          } else {
+            const { nombre, appat, apmat } = splitProfesor(profesorName);
+            const [insProf] = await db.query("INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)", [nombre, appat, apmat]);
+            profesorId = insProf.insertId;
+          }
         } else {
-          const [insProf] = await db.query("INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)", ["Desconocido", "-", "-"]);
-          profesorId = insProf.insertId;
+          const [profRows] = await db.query("SELECT id_profesor FROM profesor WHERE prof_nombre = ? LIMIT 1", ["Desconocido"]);
+          if (profRows && profRows.length > 0) {
+            profesorId = profRows[0].id_profesor;
+          } else {
+            const [insProf] = await db.query("INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)", ["Desconocido", "-", "-"]);
+            profesorId = insProf.insertId;
+          }
         }
         const [insMat] = await db.query("INSERT INTO materia (sig_nombre, id_profesor) VALUES (?, ?)", [asignatura_nombre, profesorId]);
         materiaId = insMat.insertId;
@@ -148,10 +181,12 @@ export const crearHorario = async (req, res) => {
 export const listarHorarios = async (_req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura
+      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
+              CONCAT_WS(' ', p.prof_nombre, p.prof_appat, p.prof_apmat) AS profesor
        FROM horario_grupo hg
        LEFT JOIN grupo g ON hg.id_grupo = g.id_grupo
        LEFT JOIN materia m ON hg.id_materia = m.id_materia
+       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor
        ORDER BY FIELD(hg.dia, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hg.hora_inicio`
     );
     res.json({ horarios: rows });
@@ -194,10 +229,12 @@ export const buscarPorBloque = async (req, res) => {
     const hf = hora_fin.length === 5 ? `${hora_fin}:00` : hora_fin;
 
     const [rows] = await db.query(
-      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura
+      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
+              CONCAT_WS(' ', p.prof_nombre, p.prof_appat, p.prof_apmat) AS profesor
        FROM horario_grupo hg
        LEFT JOIN grupo g ON hg.id_grupo = g.id_grupo
        LEFT JOIN materia m ON hg.id_materia = m.id_materia
+       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor
        WHERE hg.dia = ? AND NOT (hg.hora_fin <= ? OR hg.hora_inicio >= ?)
        ORDER BY hg.hora_inicio`,
       [dia, hi, hf]
@@ -239,10 +276,12 @@ export const asignarSalon = async (req, res) => {
 
     // devolver horario actualizado
     const [updated] = await db.query(
-      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura
+      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
+              CONCAT_WS(' ', p.prof_nombre, p.prof_appat, p.prof_apmat) AS profesor
        FROM horario_grupo hg
        LEFT JOIN grupo g ON hg.id_grupo = g.id_grupo
        LEFT JOIN materia m ON hg.id_materia = m.id_materia
+       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor
        WHERE hg.id_horario = ? LIMIT 1`,
       [id]
     );
@@ -278,6 +317,66 @@ export const asignarSalon = async (req, res) => {
     }
   } catch (err) {
     console.error('Error en asignarSalon:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+export const desasignarSalon = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: 'Falta id del horario' });
+
+    // comprobar horario y salón actual
+    const [hRows] = await db.query('SELECT * FROM horario_grupo WHERE id_horario = ? LIMIT 1', [id]);
+    if (!hRows || hRows.length === 0) return res.status(404).json({ error: 'Horario no encontrado' });
+    const h = hRows[0];
+    const previousSalon = h.id_salon || null;
+
+    // desasignar
+    await db.query('UPDATE horario_grupo SET id_salon = NULL WHERE id_horario = ?', [id]);
+
+    // devolver horario actualizado
+    const [updated] = await db.query(
+      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
+              CONCAT_WS(' ', p.prof_nombre, p.prof_appat, p.prof_apmat) AS profesor
+       FROM horario_grupo hg
+       LEFT JOIN grupo g ON hg.id_grupo = g.id_grupo
+       LEFT JOIN materia m ON hg.id_materia = m.id_materia
+       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor
+       WHERE hg.id_horario = ? LIMIT 1`,
+      [id]
+    );
+    const horario = updated && updated[0] ? updated[0] : null;
+
+    // Si había salón asignado, recalcular su estado actual
+    if (previousSalon) {
+      try {
+        const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+        const now = new Date();
+        const diaHoy = dias[now.getDay()];
+        const pad = (n) => String(n).padStart(2, '0');
+        const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+        const [activeRows] = await db.query(
+          `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND hora_inicio <= ? AND hora_fin > ?`,
+          [previousSalon, diaHoy, horaActual, horaActual]
+        );
+        const ocupado = activeRows && activeRows[0] && activeRows[0].cnt > 0;
+        const nuevoEstado = ocupado ? 'Ocupado' : 'Disponible';
+
+        await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', [nuevoEstado, previousSalon]);
+        const [salRows] = await db.query('SELECT * FROM salon WHERE id_salon = ? LIMIT 1', [previousSalon]);
+        const salonActualizado = salRows && salRows[0] ? salRows[0] : null;
+        return res.json({ message: 'Salón desasignado', horario, salon: salonActualizado });
+      } catch (err2) {
+        console.error('Error actualizando estado de salón (desasignar):', err2);
+        return res.json({ message: 'Salón desasignado', horario });
+      }
+    }
+
+    return res.json({ message: 'Salón desasignado', horario });
+  } catch (err) {
+    console.error('Error en desasignarSalon:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 };

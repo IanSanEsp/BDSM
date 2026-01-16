@@ -3,6 +3,8 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
+const ADMIN_VALUES = ["admin", "administrador", "adminisrtrador"];
+
 export const obtenerUsuarios = async (req, res) => {
   try {
     // No exponer contraseñas
@@ -55,7 +57,15 @@ export const registrarUsuario = async (req, res) => {
 
     // Generar ID y tipo usuario
     const id = crypto.randomUUID();
-    const tipo = "usuario";
+    // tipo por defecto
+    let tipo = "usuario";
+    // permitir especificar tipo_user si viene autenticado como admin y la solicitud lo pide
+    const bodyTipo = (req.body || {}).tipo_user;
+    const reqUser = req.user; // estará definido si la ruta está protegida
+    const isAdminReq = reqUser && ADMIN_VALUES.includes(String(reqUser.tipo || '').toLowerCase());
+    if (isAdminReq && bodyTipo && ADMIN_VALUES.includes(String(bodyTipo).toLowerCase())) {
+      tipo = "adminisrtrador";
+    }
 
     // desactivar hashing .env
     const disableHash = String(process.env.DISABLE_PASSWORD_HASH || "").toLowerCase() === "true";
@@ -88,6 +98,20 @@ export const registrarUsuario = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al registrar usuario:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// Registrar usuario con rol admin (ruta protegida)
+export const registrarAdmin = async (req, res) => {
+  try {
+    console.log('registrarAdmin - req.body:', JSON.stringify(req.body));
+    console.log('registrarAdmin - req.user:', JSON.stringify(req.user));
+    req.body = req.body || {};
+    req.body.tipo_user = "administrador";
+    return registrarUsuario(req, res);
+  } catch (error) {
+    console.error("Error al registrar admin:", error);
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
@@ -158,6 +182,93 @@ export const loginUsuario = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en login:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+export const actualizarUsuario = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: "Falta id_usuario" });
+
+    const {
+      nombre,
+      appat,
+      apmat,
+      correo: correoBody,
+      correo_electronico: correoAlt,
+      tipo_user,
+      contrasena
+    } = req.body || {};
+
+    const fields = [];
+    const values = [];
+
+    if (nombre !== undefined) { fields.push("nombre = ?"); values.push(nombre); }
+    if (appat !== undefined) { fields.push("appat = ?"); values.push(appat); }
+    if (apmat !== undefined) { fields.push("apmat = ?"); values.push(apmat); }
+
+    const correo = correoBody !== undefined ? correoBody : (correoAlt !== undefined ? correoAlt : undefined);
+    if (correo !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(correo)) {
+        return res.status(400).json({ error: "Correo electrónico inválido" });
+      }
+      fields.push("correo_electronico = ?"); values.push(correo);
+    }
+
+    if (tipo_user !== undefined) {
+      fields.push("tipo_user = ?"); values.push(tipo_user);
+    }
+
+    if (contrasena !== undefined && String(contrasena).length > 0) {
+      if (String(contrasena).length < 8) {
+        return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
+      }
+      const disableHash = String(process.env.DISABLE_PASSWORD_HASH || "").toLowerCase() === "true";
+      let passwordToStore = contrasena;
+      if (!disableHash) {
+        const cost = parseInt(process.env.BCRYPT_COST || "10", 10);
+        const pepper = process.env.PASSWORD_PEPPER || "";
+        const base = `${contrasena}${pepper}`;
+        passwordToStore = await bcrypt.hash(base, isNaN(cost) ? 10 : cost);
+      }
+      fields.push("contrasena = ?"); values.push(passwordToStore);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "No hay cambios a aplicar" });
+    }
+
+    values.push(id);
+    const [result] = await db.query(`UPDATE usuario SET ${fields.join(", ")} WHERE id_usuario = ?`, values);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const [rows] = await db.query(
+      "SELECT id_usuario, nombre, apmat, appat, correo_electronico, tipo_user FROM usuario WHERE id_usuario = ? LIMIT 1",
+      [id]
+    );
+    return res.json({ message: "Usuario actualizado", usuario: rows && rows[0] ? rows[0] : null });
+  } catch (error) {
+    console.error("Error al actualizar usuario:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+export const eliminarUsuario = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: "Falta id_usuario" });
+
+    const [result] = await db.query("DELETE FROM usuario WHERE id_usuario = ?", [id]);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    return res.json({ message: "Usuario eliminado" });
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error);
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };

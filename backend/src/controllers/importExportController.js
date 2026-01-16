@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import xlsx from "xlsx";
 import { db } from "../config/db.js";
 
 const EXPORT_FILE_RELATIVE = path.join('..', '..', 'Exportacion_datos', 'Exportacion_datos', 'horarios.json');
@@ -13,6 +14,14 @@ function formatTimeRange(hInicio, hFin) {
     return `${Number(parts[0])}:${String(parts[1]).padStart(2, '0')}`;
   };
   return `${fmt(hInicio)} - ${fmt(hFin)}`;
+}
+
+function excelTimeToString(excelTime) {
+  // Excel time is fraction of day, e.g. 0.5 = 12:00
+  const totalMinutes = Math.round(excelTime * 24 * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 }
 
 export const exportHorarios = async (_req, res) => {
@@ -45,37 +54,106 @@ export const exportHorarios = async (_req, res) => {
   }
 };
 
-async function ensureProfesor(nombreCompleto) {
-  // nombreCompleto puede ser 'Ramírez' o 'Juan Ramírez'
-  if (!nombreCompleto) {
-    const [rows] = await db.query('SELECT id_profesor FROM profesor LIMIT 1');
-    if (rows && rows.length > 0) return rows[0].id_profesor;
-    const [ins] = await db.query('INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)', ['Desconocido', '-', '-']);
-    return ins.insertId;
-  }
-  const parts = String(nombreCompleto).trim().split(/\s+/);
-  let nombre = 'Desconocido', appat = '-', apmat = '-';
-  if (parts.length === 1) {
-    appat = parts[0];
-  } else if (parts.length >= 2) {
-    nombre = parts[0];
-    appat = parts[parts.length - 1];
-    if (parts.length > 2) apmat = parts.slice(1, parts.length - 1).join(' ');
-  }
+async function ensureSalon(nombre) {
+  if (!nombre) return null;
+  const [found] = await db.query('SELECT id_salon FROM salon WHERE nombre = ? LIMIT 1', [nombre]);
+  if (found && found.length > 0) return found[0].id_salon;
 
-  // Intentar buscar un profesor por apellido
-  const [found] = await db.query('SELECT id_profesor FROM profesor WHERE prof_appat = ? LIMIT 1', [appat]);
-  if (found && found.length > 0) return found[0].id_profesor;
+  // Crear salon con valores por defecto
+  const id_salon = crypto.randomUUID();
+  await db.query('INSERT INTO salon (id_salon, nombre, piso, tipo, estado) VALUES (?, ?, ?, ?, ?)', [id_salon, nombre, '1', 'Aula', 'Disponible']);
+  return id_salon;
+}
 
-  const [ins] = await db.query('INSERT INTO profesor (prof_nombre, prof_appat, prof_apmat) VALUES (?, ?, ?)', [nombre, appat, apmat]);
+async function ensureMateria(sigla, id_profesor) {
+  if (!sigla || !id_profesor) return null;
+  const [found] = await db.query('SELECT id_materia FROM materia WHERE sig_nombre = ? AND id_profesor = ? LIMIT 1', [sigla, id_profesor]);
+  if (found && found.length > 0) return found[0].id_materia;
+
+  const [ins] = await db.query('INSERT INTO materia (sig_nombre, id_profesor) VALUES (?, ?)', [sigla, id_profesor]);
   return ins.insertId;
+}
+
+async function ensureGrupo(id_materia, grupo_nombre = null) {
+  if (!id_materia) return null;
+  if (!grupo_nombre) grupo_nombre = `Grupo_${id_materia}`;
+  const [found] = await db.query('SELECT id_grupo FROM grupo WHERE grupo_nombre = ? AND id_materia = ? LIMIT 1', [grupo_nombre, id_materia]);
+  if (found && found.length > 0) return found[0].id_grupo;
+
+  const [ins] = await db.query('INSERT INTO grupo (grupo_nombre, id_materia) VALUES (?, ?)', [grupo_nombre, id_materia]);
+  const id_grupo = ins.insertId;
+  // Insertar en grupo_materia
+  await db.query('INSERT INTO grupo_materia (id_grupo, id_materia) VALUES (?, ?)', [id_grupo, id_materia]);
+  return id_grupo;
 }
 
 export const importHorarios = async (req, res) => {
   try {
-    // El JSON puede venir en el body como { salones: {...} } o si no se envia, intentar leer el archivo de Exportacion_datos
+    console.log('Import request received');
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file);
     let data = req.body;
-    if (!data || Object.keys(data).length === 0) {
+    let fromExcel = false;
+
+    // Si hay archivo Excel, parsearlo
+    if (req.file) {
+      const workbook = xlsx.readFile(req.file.path);
+      const sheetName = workbook.SheetNames.includes('Horarios') ? 'Horarios' : workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = xlsx.utils.sheet_to_json(worksheet);
+
+      // Convertir a formato esperado: { salones: { salonNombre: [ { materia, profesor, hora, dia? } ] } }
+      data = { salones: {} };
+      for (const row of jsonData) {
+        const salon = String(row.salon || row.Salon || row.Salón || '').trim();
+        const materia = String(row.materia || row.Materia || row.Asignatura || '').trim();
+        const profesor = String(row.profesor || row.Profesor || '').trim();
+        const hora = String(row.hora || row.Hora || '').trim();
+        const dia = String(row.dia || row.Dia || row.Día || 'Lunes').trim();
+
+        if (!salon || !materia) continue; // saltar filas incompletas
+
+        if (!data.salones[salon]) data.salones[salon] = [];
+        data.salones[salon].push({ materia, profesor, hora, dia });
+      }
+
+      fromExcel = true;
+      // If the data is in database format (with IDs), insert directly
+      if (jsonData.length > 0 && jsonData[0].Id_salon) {
+        const inserted = [];
+        for (const row of jsonData) {
+          const id_salon = row.Id_salon;
+          const id_grupo = row.Id_grupo;
+          const dia = row.horario_dia;
+          const hora_inicio = excelTimeToString(row.hora_inicio);
+          const hora_fin = excelTimeToString(row.hora_final);
+
+          // Get id_materia
+          const [materiaRows] = await db.query('SELECT id_materia FROM grupo_materia WHERE id_grupo = ? LIMIT 1', [id_grupo]);
+          if (!materiaRows || materiaRows.length === 0) continue; // skip if no materia
+          const id_materia = materiaRows[0].id_materia;
+
+          // Check collision
+          const [collision] = await db.query(
+            `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
+            [id_salon, dia, hora_inicio, hora_fin]
+          );
+          if (collision && collision[0] && collision[0].cnt > 0) {
+            continue; // skip
+          }
+
+          console.log('Inserting', id_grupo, id_materia, id_salon, dia, hora_inicio, hora_fin);
+          // const [ins] = await db.query(
+          //   `INSERT INTO horario_grupo (id_grupo, id_materia, id_salon, dia, hora_inicio, hora_fin) VALUES (?, ?, ?, ?, ?, ?)`,
+          //   [id_grupo, id_materia, id_salon, dia, hora_inicio, hora_fin]
+          // );
+          // inserted.push({ id: ins.insertId, salon: id_salon, grupo: id_grupo });
+        }
+        return res.json({ message: 'Importación directa completada', inserted });
+      }
+
+      // Else, convert to expected format
+    } else if (!data || Object.keys(data).length === 0) {
       // intentar leer fichero
       const filePath = path.join(process.cwd(), EXPORT_FILE_RELATIVE);
       if (!fs.existsSync(filePath)) {
@@ -91,88 +169,41 @@ export const importHorarios = async (req, res) => {
     const salonesCreated = [];
     const horariosInserted = [];
     for (const [salonNombre, entradas] of Object.entries(data.salones)) {
-      // Buscar o crear salón por nombre
-      const [sRows] = await db.query('SELECT id_salon FROM salon WHERE nombre = ? LIMIT 1', [salonNombre]);
-      let id_salon;
-      if (sRows && sRows.length > 0) {
-        id_salon = sRows[0].id_salon;
-      } else {
-        // crear salón con valores por defecto
-        const idGen = crypto.randomUUID();
-        await db.query('INSERT INTO salon (id_salon, nombre, piso, tipo, estado) VALUES (?, ?, ?, ?, ?)', [idGen, salonNombre, '1', 'Aula', 'Disponible']);
-        id_salon = idGen;
-        salonesCreated.push(salonNombre);
-      }
+      console.log('Processing salon:', salonNombre, 'with', entradas.length, 'entries');
+      const id_salon = await ensureSalon(salonNombre);
+      if (!id_salon) continue;
+      salonesCreated.push(salonNombre);
 
-      if (!Array.isArray(entradas)) continue;
+      for (const entrada of entradas) {
+        const { materia, profesor, hora, dia = 'Lunes' } = entrada;
+        if (!materia || !hora) continue;
 
-      for (const e of entradas) {
-        const materiaNombre = e.materia || 'SinAsignar';
-        const profesorNombre = e.profesor || e.profesor || null;
-        const hora = e.hora || null; // ejemplo "8:00 - 9:00"
+        // Parsear hora: asumir formato "08:00 - 10:00"
+        const horaMatch = hora.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+        if (!horaMatch) continue;
+        const hora_inicio = horaMatch[1] + ':00';
+        const hora_fin = horaMatch[2] + ':00';
 
-        // asegurar profesor
-        const id_profesor = await ensureProfesor(profesorNombre);
+        const id_profesor = await ensureProfesor(profesor);
+        const id_materia = await ensureMateria(materia, id_profesor);
+        const id_grupo = await ensureGrupo(id_materia);
 
-        // buscar o crear materia
-        const [mRows] = await db.query('SELECT id_materia FROM materia WHERE sig_nombre = ? LIMIT 1', [materiaNombre]);
-        let id_materia;
-        if (mRows && mRows.length > 0) {
-          id_materia = mRows[0].id_materia;
-        } else {
-          const [insM] = await db.query('INSERT INTO materia (sig_nombre, id_profesor) VALUES (?, ?)', [materiaNombre, id_profesor]);
-          id_materia = insM.insertId;
-        }
-
-        // buscar o crear grupo (usamos nombre de materia como nombre de grupo si no hay otro dato)
-        const grupoNombre = materiaNombre;
-        const [gRows] = await db.query('SELECT id_grupo FROM grupo WHERE grupo_nombre = ? LIMIT 1', [grupoNombre]);
-        let id_grupo;
-        if (gRows && gRows.length > 0) {
-          id_grupo = gRows[0].id_grupo;
-        } else {
-          const [insG] = await db.query('INSERT INTO grupo (grupo_nombre, id_materia) VALUES (?, ?)', [grupoNombre, id_materia]);
-          id_grupo = insG.insertId;
-        }
-
-        // asegurar mapping grupo_materia
-        const [mapRows] = await db.query('SELECT 1 FROM grupo_materia WHERE id_grupo = ? AND id_materia = ? LIMIT 1', [id_grupo, id_materia]);
-        if (!mapRows || mapRows.length === 0) {
-          await db.query('INSERT INTO grupo_materia (id_grupo, id_materia) VALUES (?, ?)', [id_grupo, id_materia]);
-        }
-
-        // parse hora
-        let hora_inicio = null;
-        let hora_fin = null;
-        if (hora && typeof hora === 'string' && hora.includes('-')) {
-          const parts = hora.split('-').map(s => s.trim());
-          const pad = (t) => {
-            if (!t) return null;
-            const p = t.split(':');
-            return `${String(p[0]).padStart(2,'0')}:${String(p[1]||'00').padStart(2,'0')}:00`;
-          };
-          hora_inicio = pad(parts[0]);
-          hora_fin = pad(parts[1]);
-        }
-
-        // por defecto dia Lunes si no se proporciona a nivel global
-        const dia = e.dia || 'Lunes';
-
-        // Insertar horario (si existe colisión se omite)
+        // Verificar colisión
         const [collision] = await db.query(
           `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
-          [id_salon, dia, hora_inicio || '00:00:00', hora_fin || '00:00:00']
+          [id_salon, dia, hora_inicio, hora_fin]
         );
         if (collision && collision[0] && collision[0].cnt > 0) {
-          // saltar si colisión
+          console.log('Collision detected, skipping');
           continue;
         }
 
-        const [insH] = await db.query(
+        // Insertar horario
+        const [ins] = await db.query(
           `INSERT INTO horario_grupo (id_grupo, id_materia, id_salon, dia, hora_inicio, hora_fin) VALUES (?, ?, ?, ?, ?, ?)`,
           [id_grupo, id_materia, id_salon, dia, hora_inicio, hora_fin]
         );
-        horariosInserted.push({ id: insH.insertId, salon: salonNombre, materia: materiaNombre });
+        horariosInserted.push({ id: ins.insertId, salon: salonNombre, materia, profesor, hora, dia });
       }
     }
 

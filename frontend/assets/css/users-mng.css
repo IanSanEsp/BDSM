@@ -1,0 +1,31 @@
+/* Users management page styles */
+.users-layout{ display:flex; gap:20px; align-items:stretch; padding:18px; height: calc(100vh - 200px); }
+.users-left{ flex: 1 1 60%; background: #fff; border-radius:10px; padding:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); display:flex; flex-direction:column; }
+.users-right{ flex: 0 0 340px; background:#fff; border-radius:10px; padding:18px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); display:flex; flex-direction:column; }
+.users-left-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; position:sticky; top:0; background:#fff; z-index:2; padding-bottom:8px; }
+.users-left-header h3{ margin:0; color:var(--guinda); }
+.users-actions{ display:flex; gap:8px; align-items:center; }
+#usersSearch{ padding:8px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); min-width:160px; }
+.mng-btn{ background:var(--guinda); color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+.users-list{ display:flex; flex-direction:column; gap:8px; overflow:auto; padding-right:6px; flex:1 1 auto; }
+.user-row{ display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; cursor:pointer; border:1px solid rgba(0,0,0,0.04); }
+.user-row:hover{ background: linear-gradient(90deg, rgba(147,49,92,0.04), rgba(147,49,92,0.02)); }
+.user-row.selected{ box-shadow: inset 0 0 0 2px rgba(147,49,92,0.08); background: rgba(147,49,92,0.03); }
+.user-avatar{ width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; background: #F3E6EB; color:var(--guinda); font-weight:700; }
+.user-meta{ display:flex; flex-direction:column; }
+.user-name{ font-weight:700; color:#333; }
+.user-role{ font-size:13px; color:#777; }
+.user-status{ margin-left:auto; font-weight:700; padding:6px 8px; border-radius:12px; font-size:12px; }
+.user-status.active{ background: #E9F8F0; color:#167B4A; }
+.user-status.inactive{ background:#FFF0F0; color:#8A2041; }
+
+.users-divider{ width:1px; background: rgba(0,0,0,0.06); border-radius:2px; margin:0 8px; }
+
+.user-detail-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#8A2041; }
+.placeholder-icon{ font-size:48px; margin-bottom:12px; }
+.user-detail-card{ display:flex; flex-direction:column; gap:12px; }
+.user-detail-row{ display:flex; gap:8px; align-items:center; }
+.user-detail-label{ width:110px; color:#777; font-weight:600; }
+.user-detail-value{ color:#222; }
+
+@media (max-width: 900px){ .users-layout{ flex-direction:column; height: auto; } .users-right{ width:100%; } }

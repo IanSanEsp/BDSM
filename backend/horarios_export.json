@@ -7,6 +7,11 @@
         "profesor": "-"
       },
       {
+        "materia": "json waos",
+        "hora": "20:00 - 21:00",
+        "profesor": "-"
+      },
+      {
         "materia": "Programación web",
         "hora": "14:00 - 15:00",
         "profesor": "-"
