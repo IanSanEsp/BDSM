@@ -56,7 +56,7 @@ export const crearHorario = async (req, res) => {
       let materiaId;
       if (matRows && matRows.length > 0) {
         materiaId = matRows[0].id_materia;
-        // Si se envía profesor, actualizar la materia con ese profesor (creándolo si no existe)
+        // Si se envía profesor, actualizar la materia con ese profesor
         if (profesorName) {
           // Buscar por nombre completo
           const [profRows2] = await db.query("SELECT id_profesor FROM profesor WHERE CONCAT_WS(' ', prof_nombre, prof_appat, prof_apmat) = ? LIMIT 1", [profesorName]);

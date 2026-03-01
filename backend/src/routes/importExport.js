@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { exportHorarios, importHorarios } from "../controllers/importExportController.js";
+import { exportHorarios, importHorarios, importFullDb } from "../controllers/importExportController.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -20,7 +20,10 @@ const upload = multer({
 
 router.get("/export/horarios", exportHorarios);
 
-router.post("/import/horarios", requireAuth, requireAdmin, upload.single('excel'), importHorarios);
-router.post("/import/horarios", importHorarios); // TEMP: sin multer para testing
+// Importar TODA la base (todas las hojas como en final.xlsx) usando la ruta que ya usa el front
+router.post("/import/horarios", requireAuth, requireAdmin, upload.single('excel'), importFullDb);
+
+// Alias explícito por si lo necesitas en pruebas
+router.post("/import/full", requireAuth, requireAdmin, upload.single('excel'), importFullDb);
 
 export default router;

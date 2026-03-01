@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
     ? "http://localhost:3000"
-    : "https://bdsm-production-0032.up.railway.app";
+    : "https://bdsm-production-8774.up.railway.app";
   const token = localStorage.getItem("token") || "";
 
   const SCHED = window.AdminMngSchedule || {};
@@ -404,6 +404,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }));
   }
 
+  function openRoomFormModal(title, fields){
+    return new Promise((resolve)=>{
+      const overlay = document.createElement('div'); overlay.className = 'password-modal-overlay';
+      const card = document.createElement('div'); card.className = 'password-modal-card';
+      const inner = document.createElement('div');
+      inner.style.padding = '6px 18px 12px 18px';
+      inner.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 class="password-modal-title">${title}</h3><button class="modal-close">✕</button></div>`;
+      const form = document.createElement('div'); form.className = 'password-modal-fields';
+
+      fields.forEach(f=>{
+        const row = document.createElement('div'); row.style.display='flex'; row.style.flexDirection='column';
+        const label = document.createElement('label'); label.textContent = f.label; label.className = 'password-field-group';
+        let input;
+        if (f.type === 'select'){
+          input = document.createElement('select');
+          (f.options||[]).forEach(o=>{ const opt=document.createElement('option'); opt.value=o.value; opt.textContent=o.label; if (f.value==o.value) opt.selected=true; input.appendChild(opt); });
+        } else {
+          input = document.createElement('input'); input.type = f.type || 'text'; input.placeholder = f.placeholder || '';
+          if (f.value) input.value = f.value;
+        }
+        input.dataset.field = f.name;
+        input.className = 'password-input';
+        row.appendChild(label); row.appendChild(input); form.appendChild(row);
+      });
+
+      const actions = document.createElement('div'); actions.className = 'password-modal-actions';
+      const cancelBtn = document.createElement('button'); cancelBtn.className='password-btn cancel'; cancelBtn.textContent='Cancelar';
+      const saveBtn = document.createElement('button'); saveBtn.className='password-btn confirm'; saveBtn.textContent='Confirmar';
+      actions.appendChild(cancelBtn); actions.appendChild(saveBtn);
+
+      inner.appendChild(form); inner.appendChild(actions); card.appendChild(inner); overlay.appendChild(card); document.body.appendChild(overlay);
+
+      requestAnimationFrame(()=>{ overlay.classList.add('show'); card.classList.add('enter'); });
+
+      let keyHandler;
+      const cleanup = (res)=>{
+        if (keyHandler) document.removeEventListener('keydown', keyHandler);
+        card.classList.remove('enter'); card.classList.add('leave'); overlay.classList.remove('show');
+        const finish = ()=>{ try{ overlay.remove(); }catch(e){} resolve(res); };
+        card.addEventListener('transitionend', function onT(ev){ if (ev.target===card){ card.removeEventListener('transitionend', onT); finish(); } });
+        setTimeout(finish, 360);
+      };
+
+      cancelBtn.addEventListener('click', ()=> cleanup(null));
+      overlay.addEventListener('click', (e)=>{ if (e.target === overlay) cleanup(null); });
+      keyHandler = (e)=>{ if (e.key==='Escape'){ cleanup(null); } };
+      document.addEventListener('keydown', keyHandler);
+      const closeBtn = inner.querySelector('.modal-close');
+      closeBtn && closeBtn.addEventListener('click', ()=> cleanup(null));
+
+      saveBtn.addEventListener('click', ()=>{
+        const inputs = overlay.querySelectorAll('[data-field]');
+        const out = {};
+        inputs.forEach(i=> out[i.dataset.field] = i.value);
+        cleanup(out);
+      });
+    });
+  }
+
   // Botón para nuevo salón
   const roomsWrap = document.getElementById('roomsTableWrap');
   if (roomsWrap && !roomsWrap.querySelector('.rooms-actions')){
@@ -414,9 +473,22 @@ document.addEventListener("DOMContentLoaded", () => {
     actions.appendChild(addBtn);
     roomsWrap.insertBefore(actions, roomsWrap.firstChild);
     addBtn.addEventListener('click', async ()=>{
-      const nombre = prompt('Nombre del salón (ej. 101)'); if (!nombre) return;
-      const piso = prompt('Piso (1,2,3)'); if (!piso) return;
-      const tipo = prompt('Tipo (Aula/Laboratorio)'); if (!tipo) return;
+      const values = await openRoomFormModal('Nuevo salón', [
+        { name:'nombre', label:'Nombre del salón', type:'text', placeholder:'ej. 101' },
+        { name:'piso', label:'Piso', type:'number', placeholder:'1,2,3' },
+        { name:'tipo', label:'Tipo', type:'select', value:'Aula', options:[
+          { value:'Aula', label:'Aula' },
+          { value:'Laboratorio', label:'Laboratorio' }
+        ]}
+      ]);
+      if (!values) return;
+      const nombre = (values.nombre || '').trim();
+      const piso = (values.piso || '').trim();
+      const tipo = (values.tipo || '').trim();
+      if (!nombre || !piso || !tipo){
+        if (window.UI && window.UI.showBanner) window.UI.showBanner('error','Completa todos los campos',3500);
+        return;
+      }
       try {
         const nuevo = await crearSalon({ nombre, piso, tipo });
         rooms.push(nuevo);

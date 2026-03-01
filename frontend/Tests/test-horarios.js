@@ -1,7 +1,7 @@
 // Tester simple para horarios
 const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:3000'
-  : 'https://bdsm-production-0032.up.railway.app';
+  : 'https://bdsm-production-8774.up.railway.app';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#formHorario');
