@@ -47,6 +47,9 @@ export const crearSalon = async (req, res) => {
 
 export const listarSalones = async (_req, res) => {
   try {
+    // Recalcular estados de todos los salones (excepto los en mantenimiento)
+    await recalcularEstadosSalones();
+    
     const [rows] = await db.query(`SELECT * FROM salon ORDER BY nombre`);
     res.json(rows);
   } catch (error) {
@@ -54,6 +57,44 @@ export const listarSalones = async (_req, res) => {
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+// Función helper para recalcular estados de todos los salones
+async function recalcularEstadosSalones() {
+  try {
+    const diasEnum = [null, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', null];
+    
+    // Usar zona horaria de México (UTC-6)
+    const nowUTC = new Date();
+    const mexicoOffset = -6 * 60;
+    const nowMexico = new Date(nowUTC.getTime() + (mexicoOffset + nowUTC.getTimezoneOffset()) * 60000);
+    
+    const diaHoy = diasEnum[nowMexico.getDay()];
+    const pad = (n) => String(n).padStart(2, '0');
+    const horaActual = `${pad(nowMexico.getHours())}:${pad(nowMexico.getMinutes())}:00`;
+    
+    // Si es fin de semana, todos los salones (no en mantenimiento) están disponibles
+    if (!diaHoy) {
+      await db.query(`UPDATE salon SET estado = 'Disponible' WHERE estado != 'En Mantenimiento'`);
+      return;
+    }
+    
+    // Obtener todos los salones que NO están en mantenimiento
+    const [salones] = await db.query(`SELECT id_salon FROM salon WHERE estado != 'En Mantenimiento'`);
+    
+    for (const salon of salones) {
+      const [activeRows] = await db.query(
+        `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND hora_inicio <= ? AND hora_fin > ?`,
+        [salon.id_salon, diaHoy, horaActual, horaActual]
+      );
+      const ocupado = activeRows && activeRows[0] && activeRows[0].cnt > 0;
+      const nuevoEstado = ocupado ? 'Ocupado' : 'Disponible';
+      
+      await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', [nuevoEstado, salon.id_salon]);
+    }
+  } catch (err) {
+    console.error('Error recalculando estados de salones:', err);
+  }
+}
 
 export const actualizarSalon = async (req, res) => {
   try {
