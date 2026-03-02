@@ -137,11 +137,14 @@
 /* Card */
 .filter-card {
     width: 470px;
+    max-width: 90vw;
     background: #F9F0F7; 
     padding: 25px 30px;
     border-radius: 14px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     animation: modalPop 0.25s ease;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 @keyframes modalPop {
@@ -173,14 +176,20 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.filter-grid select {
+.filter-grid select,
+.filter-grid input {
     padding: 8px 10px;
     border: 1px solid #A1365A;
     border-radius: 8px;
     background: #FFFFFF;
     color: #3A3A3A;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .filter-footer {
