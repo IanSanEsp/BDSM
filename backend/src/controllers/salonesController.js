@@ -93,11 +93,19 @@ export const actualizarSalon = async (req, res) => {
     // Si se quitó mantenimiento y se puso "Disponible", recalcular según horario actual
     if (estado !== undefined && String(estado) === "Disponible") {
       try {
-        const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+        // Valores exactos del ENUM en la BD
+        const diasEnum = [null, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', null];
         const now = new Date();
-        const diaHoy = dias[now.getDay()];
+        const diaHoy = diasEnum[now.getDay()];
         const pad = (n) => String(n).padStart(2, '0');
-        const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
+
+        // Si es fin de semana, no hay horarios - mantener Disponible
+        if (!diaHoy) {
+          // ya se puso Disponible arriba
+          const [rows] = await db.query(`SELECT * FROM salon WHERE id_salon = ? LIMIT 1`, [id]);
+          return res.json({ message: "Salón actualizado", salon: rows && rows[0] ? rows[0] : null });
+        }
 
         const [activeRows] = await db.query(
           `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND hora_inicio <= ? AND hora_fin > ?`,

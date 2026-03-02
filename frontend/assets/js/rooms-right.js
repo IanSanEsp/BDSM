@@ -211,16 +211,22 @@
   const FALLBACK_PERIOD_STARTS = ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
   const FALLBACK_PERIOD_LEN = 50;
 
+  function normalizeDay(str) {
+    // Quitar acentos y pasar a minúsculas para comparar
+    return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
   function findCurrentEvent(schedule) {
     if (!Array.isArray(schedule) || schedule.length === 0) return null;
     const now = new Date();
+    // Días en español sin acentos para comparar
     const days = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
     const today = days[now.getDay()];
     const nowMin = now.getHours() * 60 + now.getMinutes();
     for (const row of schedule) {
-      const dia = (row.dia || row.day || '').toString().toLowerCase();
+      const dia = normalizeDay(row.dia || row.day || '');
       if (!dia) continue;
-      if (!dia.includes(today)) continue;
+      if (dia !== today) continue;
       const inicio = timeToMinutes(row.inicio || row.start || row.hora_inicio || '');
       const fin = timeToMinutes(row.fin || row.end || row.hora_fin || '');
       if (inicio !== null && fin !== null && nowMin >= inicio && nowMin < fin) {

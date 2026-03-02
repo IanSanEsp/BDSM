@@ -295,13 +295,22 @@ export const asignarSalon = async (req, res) => {
 
     // Actualizar estado del salón por hora actual
     try {
-      const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+      // Valores exactos del ENUM en la BD
+      const diasEnum = [null, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', null];
       const now = new Date();
-      const diaHoy = dias[now.getDay()];
+      const diaHoy = diasEnum[now.getDay()];
+      
+      // Si es fin de semana, no hay horarios
+      if (!diaHoy) {
+        await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', ['Disponible', id_salon]);
+        const [salRows] = await db.query('SELECT * FROM salon WHERE id_salon = ? LIMIT 1', [id_salon]);
+        return res.json({ message: 'Salón asignado', horario, salon: salRows && salRows[0] ? salRows[0] : null });
+      }
+      
       const pad = (n) => String(n).padStart(2, '0');
-      const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
 
-      // Verificar horario para salón
+      // Verificar horario para salón - comparación exacta con valor ENUM
       const [activeRows] = await db.query(
         `SELECT COUNT(*) AS cnt FROM horario_grupo WHERE id_salon = ? AND dia = ? AND hora_inicio <= ? AND hora_fin > ?`,
         [id_salon, diaHoy, horaActual, horaActual]
