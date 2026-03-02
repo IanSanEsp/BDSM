@@ -845,11 +845,18 @@ async function fetchScheduleFor(clave) {
     try {
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         let res = await fetch(`${API_BASE}/api/horarios?salon=${encodeURIComponent(key)}`, { headers });
+        let data;
         if (!res.ok) {
-            // intento alterno: obtener todos y filtrar
+            // intento alterno: obtener todos y filtrar por id_salon en cliente
             res = await fetch(`${API_BASE}/api/horarios`, { headers });
+            data = await res.json();
+            let arr = Array.isArray(data?.horarios) ? data.horarios : (Array.isArray(data) ? data : []);
+            // filtrar por id_salon para evitar mostrar horarios de otros salones
+            arr = arr.filter(h => String(h.id_salon) === key);
+            scheduleCache.set(key, arr);
+            return arr;
         }
-        const data = await res.json();
+        data = await res.json();
         const arr = Array.isArray(data?.horarios) ? data.horarios : (Array.isArray(data) ? data : []);
         scheduleCache.set(key, arr);
         return arr;

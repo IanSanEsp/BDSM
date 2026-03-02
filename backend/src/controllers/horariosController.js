@@ -178,17 +178,22 @@ export const crearHorario = async (req, res) => {
   }
 };
 
-export const listarHorarios = async (_req, res) => {
+export const listarHorarios = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
+    const { salon } = req.query || {};
+    let sql = `SELECT hg.*, g.grupo_nombre, m.sig_nombre AS asignatura,
               CONCAT_WS(' ', p.prof_nombre, p.prof_appat, p.prof_apmat) AS profesor
        FROM horario_grupo hg
        LEFT JOIN grupo g ON hg.id_grupo = g.id_grupo
        LEFT JOIN materia m ON hg.id_materia = m.id_materia
-       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor
-       ORDER BY FIELD(hg.dia, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hg.hora_inicio`
-    );
+       LEFT JOIN profesor p ON m.id_profesor = p.id_profesor`;
+    const params = [];
+    if (salon) {
+      sql += ` WHERE hg.id_salon = ?`;
+      params.push(salon);
+    }
+    sql += ` ORDER BY FIELD(hg.dia, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hg.hora_inicio`;
+    const [rows] = await db.query(sql, params);
     res.json({ horarios: rows });
   } catch (err) {
     console.error('Error al listar horarios:', err);

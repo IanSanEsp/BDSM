@@ -175,17 +175,27 @@
   }
 
   async function fetchScheduleFor(clave) {
-    if (scheduleCache.has(clave)) return scheduleCache.get(clave);
+    const key = String(clave);
+    if (scheduleCache.has(key)) return scheduleCache.get(key);
     try {
       const headers = TOKEN ? { 'Authorization': `Bearer ${TOKEN}` } : {};
-      const res = await fetch(`${API_BASE}/api/horarios?salon=${encodeURIComponent(clave)}`, { headers });
-      if (!res.ok) throw new Error('Schedule fetch failed');
-      const data = await res.json();
+      let res = await fetch(`${API_BASE}/api/horarios?salon=${encodeURIComponent(key)}`, { headers });
+      let data;
+      if (!res.ok) {
+        // fallback: obtener todos y filtrar por id_salon
+        res = await fetch(`${API_BASE}/api/horarios`, { headers });
+        data = await res.json();
+        let arr = Array.isArray(data?.horarios) ? data.horarios : (Array.isArray(data) ? data : []);
+        arr = arr.filter(h => String(h.id_salon) === key);
+        scheduleCache.set(key, arr);
+        return arr;
+      }
+      data = await res.json();
       const arr = Array.isArray(data?.horarios) ? data.horarios : (Array.isArray(data) ? data : []);
-      scheduleCache.set(clave, arr);
+      scheduleCache.set(key, arr);
       return arr;
     } catch (err) {
-      scheduleCache.set(clave, []);
+      scheduleCache.set(key, []);
       return [];
     }
   }
