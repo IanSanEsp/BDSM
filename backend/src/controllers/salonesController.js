@@ -95,10 +95,15 @@ export const actualizarSalon = async (req, res) => {
       try {
         // Valores exactos del ENUM en la BD
         const diasEnum = [null, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', null];
-        const now = new Date();
-        const diaHoy = diasEnum[now.getDay()];
+        
+        // Usar zona horaria de México (UTC-6)
+        const nowUTC = new Date();
+        const mexicoOffset = -6 * 60;
+        const nowMexico = new Date(nowUTC.getTime() + (mexicoOffset + nowUTC.getTimezoneOffset()) * 60000);
+        
+        const diaHoy = diasEnum[nowMexico.getDay()];
         const pad = (n) => String(n).padStart(2, '0');
-        const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
+        const horaActual = `${pad(nowMexico.getHours())}:${pad(nowMexico.getMinutes())}:00`;
 
         // Si es fin de semana, no hay horarios - mantener Disponible
         if (!diaHoy) {

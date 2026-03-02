@@ -297,18 +297,28 @@ export const asignarSalon = async (req, res) => {
     try {
       // Valores exactos del ENUM en la BD
       const diasEnum = [null, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', null];
-      const now = new Date();
-      const diaHoy = diasEnum[now.getDay()];
+      
+      // Usar zona horaria de México (UTC-6, o UTC-5 en horario de verano)
+      const nowUTC = new Date();
+      const mexicoOffset = -6 * 60; // UTC-6 en minutos (ajustar a -5 si es horario de verano)
+      const nowMexico = new Date(nowUTC.getTime() + (mexicoOffset + nowUTC.getTimezoneOffset()) * 60000);
+      
+      const diaHoy = diasEnum[nowMexico.getDay()];
+      
+      console.log(`[asignarSalon] UTC: ${nowUTC.toISOString()}, México: ${nowMexico.toISOString()}, día: ${diaHoy}, dayIndex: ${nowMexico.getDay()}`);
       
       // Si es fin de semana, no hay horarios
       if (!diaHoy) {
+        console.log(`[asignarSalon] Fin de semana, poniendo Disponible`);
         await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', ['Disponible', id_salon]);
         const [salRows] = await db.query('SELECT * FROM salon WHERE id_salon = ? LIMIT 1', [id_salon]);
         return res.json({ message: 'Salón asignado', horario, salon: salRows && salRows[0] ? salRows[0] : null });
       }
       
       const pad = (n) => String(n).padStart(2, '0');
-      const horaActual = `${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
+      const horaActual = `${pad(nowMexico.getHours())}:${pad(nowMexico.getMinutes())}:00`;
+
+      console.log(`[asignarSalon] Buscando horarios para salon=${id_salon}, dia=${diaHoy}, hora=${horaActual}`);
 
       // Verificar horario para salón - comparación exacta con valor ENUM
       const [activeRows] = await db.query(
@@ -317,6 +327,8 @@ export const asignarSalon = async (req, res) => {
       );
       const ocupado = activeRows && activeRows[0] && activeRows[0].cnt > 0;
       const nuevoEstado = ocupado ? 'Ocupado' : 'Disponible';
+
+      console.log(`[asignarSalon] Resultado: cnt=${activeRows?.[0]?.cnt}, nuevoEstado=${nuevoEstado}`);
 
       await db.query('UPDATE salon SET estado = ? WHERE id_salon = ?', [nuevoEstado, id_salon]);
 
