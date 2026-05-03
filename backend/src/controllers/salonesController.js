@@ -2,40 +2,63 @@ import { db } from "../config/db.js";
 
 // Pisos
 const PISOS_VALIDOS = new Set(["0", "1", "2", "3"]);
-const TIPOS_VALIDOS = new Set(["Aula", "Laboratorio", "Otro"]);
 const ESTADOS_VALIDOS = new Set(["Disponible", "Ocupado", "Provisional", "En Mantenimiento"]);
+
+async function resolveTipoSalonId(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const asNumber = Number(value);
+  if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) {
+    const [rows] = await db.query(
+      "SELECT id_tipo_salon AS id FROM tipo_salon WHERE id_tipo_salon = ? LIMIT 1",
+      [asNumber]
+    );
+    return rows && rows[0] ? rows[0].id : null;
+  }
+  const [rows] = await db.query(
+    "SELECT id_tipo_salon AS id FROM tipo_salon WHERE nombre_tipo_salon = ? LIMIT 1",
+    [String(value)]
+  );
+  return rows && rows[0] ? rows[0].id : null;
+}
 
 export const crearSalon = async (req, res) => {
   try {
-    const { numero_salon, piso, capacidad, tipo, proyector, estado } = req.body || {};
+    const {
+      nombre_salon,
+      piso,
+      tipo_salon,
+      // compatibilidad: algunos clientes mandan `tipo`
+      tipo,
+      estado
+    } = req.body || {};
 
-    if (!numero_salon || piso === undefined || capacidad === undefined || !tipo) {
-      return res.status(400).json({ error: "Faltan campos requeridos: numero_salon, piso, capacidad, tipo" });
+    if (!nombre_salon || piso === undefined || (!tipo_salon && !tipo)) {
+      return res.status(400).json({ error: "Faltan campos requeridos: nombre_salon, piso, tipo_salon" });
     }
 
     if (!PISOS_VALIDOS.has(String(piso))) {
       return res.status(400).json({ error: "piso inválido (válidos: 0,1,2,3)" });
-    }
-    if (!TIPOS_VALIDOS.has(String(tipo))) {
-      return res.status(400).json({ error: "tipo inválido (válidos: 'Aula','Laboratorio','Otro')" });
     }
     const estadoFinal = estado ? String(estado) : "Disponible";
     if (!ESTADOS_VALIDOS.has(estadoFinal)) {
       return res.status(400).json({ error: "estado inválido (válidos: 'Disponible','Ocupado','Provisional','En Mantenimiento')" });
     }
 
-    const proyectorBool = !!proyector;
+    const tipoSalonId = await resolveTipoSalonId(tipo_salon ?? tipo);
+    if (!tipoSalonId) {
+      return res.status(400).json({ error: "tipo_salon inválido (no existe en catálogo tipo_salon)" });
+    }
 
     const [result] = await db.query(
-      `INSERT INTO Salones (numero_salon, piso, capacidad, tipo, proyector, estado)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [numero_salon, Number(piso), Number(capacidad), String(tipo), proyectorBool, estadoFinal]
+      `INSERT INTO Salones (nombre_salon, piso, tipo_salon, estado)
+       VALUES (?, ?, ?, ?)`,
+      [String(nombre_salon), Number(piso), tipoSalonId, estadoFinal]
     );
 
     const id = result.insertId;
     return res.status(201).json({
       message: "Salón creado",
-      salon: { id_salon: id, numero_salon, piso: Number(piso), capacidad: Number(capacidad), tipo: String(tipo), proyector: proyectorBool, estado: estadoFinal }
+      salon: { id_salon: id, nombre_salon: String(nombre_salon), piso: Number(piso), tipo_salon: tipoSalonId, estado: estadoFinal }
     });
   } catch (error) {
     console.error("Error al crear salón:", error);
@@ -46,20 +69,30 @@ export const crearSalon = async (req, res) => {
 // Buscar salones con estado calculado
 export const listarSalones = async (req, res) => {
   try {
-    const { numero_salon, piso, tipo, estado } = req.query || {};
+    const { nombre_salon, piso, tipo_salon, tipo, estado } = req.query || {};
 
     // Recalcular estados según Horario_Fijo / Horario_Dinamico
     await recalcularEstadosSalones();
 
-    let sql = "SELECT * FROM Salones WHERE 1=1";
+    let sql = `SELECT s.*, ts.nombre_tipo_salon
+               FROM Salones s
+               JOIN tipo_salon ts ON s.tipo_salon = ts.id_tipo_salon
+               WHERE 1=1`;
     const params = [];
 
-    if (numero_salon) { sql += " AND numero_salon = ?"; params.push(numero_salon); }
-    if (piso !== undefined) { sql += " AND piso = ?"; params.push(Number(piso)); }
-    if (tipo) { sql += " AND tipo = ?"; params.push(tipo); }
-    if (estado) { sql += " AND estado = ?"; params.push(estado); }
+    if (nombre_salon) { sql += " AND s.nombre_salon LIKE ?"; params.push(`%${nombre_salon}%`); }
+    if (piso !== undefined) { sql += " AND s.piso = ?"; params.push(Number(piso)); }
+    if (estado) { sql += " AND s.estado = ?"; params.push(estado); }
+    if (tipo_salon !== undefined || tipo !== undefined) {
+      const tipoSalonId = await resolveTipoSalonId(tipo_salon ?? tipo);
+      if (!tipoSalonId) {
+        return res.status(400).json({ error: "tipo_salon inválido (no existe en catálogo tipo_salon)" });
+      }
+      sql += " AND s.tipo_salon = ?";
+      params.push(tipoSalonId);
+    }
 
-    sql += " ORDER BY piso, numero_salon";
+    sql += " ORDER BY s.piso, s.nombre_salon";
     const [rows] = await db.query(sql, params);
     res.json(rows);
   } catch (error) {
@@ -127,14 +160,11 @@ async function recalcularEstadosSalones() {
 export const actualizarSalon = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { numero_salon, piso, capacidad, tipo, proyector, estado } = req.body || {};
+    const { nombre_salon, piso, tipo_salon, tipo, estado } = req.body || {};
     if (!id) return res.status(400).json({ error: "Falta id del salón" });
 
     if (piso !== undefined && !PISOS_VALIDOS.has(String(piso))) {
       return res.status(400).json({ error: "piso inválido (válidos: 0,1,2,3)" });
-    }
-    if (tipo !== undefined && !TIPOS_VALIDOS.has(String(tipo))) {
-      return res.status(400).json({ error: "tipo inválido (válidos: 'Aula','Laboratorio','Otro')" });
     }
     if (estado !== undefined && !ESTADOS_VALIDOS.has(String(estado))) {
       return res.status(400).json({ error: "estado inválido (válidos: 'Disponible','Ocupado','Provisional','En Mantenimiento')" });
@@ -142,11 +172,16 @@ export const actualizarSalon = async (req, res) => {
 
     const fields = [];
     const values = [];
-    if (numero_salon !== undefined) { fields.push("numero_salon = ?"); values.push(numero_salon); }
+    if (nombre_salon !== undefined) { fields.push("nombre_salon = ?"); values.push(String(nombre_salon)); }
     if (piso !== undefined) { fields.push("piso = ?"); values.push(Number(piso)); }
-    if (capacidad !== undefined) { fields.push("capacidad = ?"); values.push(Number(capacidad)); }
-    if (tipo !== undefined) { fields.push("tipo = ?"); values.push(String(tipo)); }
-    if (proyector !== undefined) { fields.push("proyector = ?"); values.push(!!proyector); }
+    if (tipo_salon !== undefined || tipo !== undefined) {
+      const tipoSalonId = await resolveTipoSalonId(tipo_salon ?? tipo);
+      if (!tipoSalonId) {
+        return res.status(400).json({ error: "tipo_salon inválido (no existe en catálogo tipo_salon)" });
+      }
+      fields.push("tipo_salon = ?");
+      values.push(tipoSalonId);
+    }
     if (estado !== undefined) { fields.push("estado = ?"); values.push(String(estado)); }
 
     if (fields.length === 0) {
@@ -159,7 +194,13 @@ export const actualizarSalon = async (req, res) => {
       return res.status(404).json({ error: "Salón no encontrado" });
     }
 
-    const [rows] = await db.query(`SELECT * FROM Salones WHERE id_salon = ? LIMIT 1`, [id]);
+    const [rows] = await db.query(
+      `SELECT s.*, ts.nombre_tipo_salon
+       FROM Salones s
+       JOIN tipo_salon ts ON s.tipo_salon = ts.id_tipo_salon
+       WHERE s.id_salon = ? LIMIT 1`,
+      [id]
+    );
     return res.json({ message: "Salón actualizado", salon: rows && rows[0] ? rows[0] : null });
   } catch (error) {
     console.error("Error al actualizar salón:", error);

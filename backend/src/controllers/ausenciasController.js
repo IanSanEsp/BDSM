@@ -14,7 +14,7 @@ export const registrarAusencia = async (req, res) => {
     if (!gRows || gRows.length === 0) return res.status(400).json({ error: "Grupo no encontrado" });
 
     await db.query(
-      `INSERT INTO Ausencias_Profesor (fecha, hora, id_profesor, id_grupo, accion_tomada)
+      `INSERT INTO Incidencias (fecha, hora, id_profesor, id_grupo, accion_tomada)
        VALUES (?, ?, ?, ?, ?)`,
       [fecha, hora, id_profesor, id_grupo, accion_tomada]
     );
@@ -32,7 +32,7 @@ export const listarAusencias = async (req, res) => {
     const { fecha, id_profesor, id_grupo } = req.query || {};
 
     let sql = `SELECT a.*, u.nombre AS nombre_profesor, g.nombre_grupo
-           FROM Ausencias_Profesor a
+           FROM Incidencias a
            JOIN Profesores p ON a.id_profesor = p.id_profesor
            JOIN Usuarios u ON p.id_profesor = u.id_usuarios
            JOIN Grupos g ON a.id_grupo = g.id_grupo

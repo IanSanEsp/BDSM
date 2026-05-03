@@ -14,14 +14,13 @@ import importExportRoutes from "./routes/importExport.js";
 dotenv.config();
 const app = express();
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
-// Configuracion CORS
-// CORS: permitir orígenes conocidos y file:// (Origin: null) pal desarrollo local
+// Configuracion del putusimo CORS
+// CORS permitir orígenes conocidos y file:// (Origin: null) pal desarrollo local
 const allowedOrigins = new Set([
   "https://bdsm-seven.vercel.app",
   "http://localhost:5500",
@@ -31,13 +30,12 @@ const allowedOrigins = new Set([
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow all if explicitly enabled
     if (String(process.env.CORS_ALLOW_ALL || "").toLowerCase() === "true") {
       return callback(null, true);
     }
-    // Same-origin or server-to-server (no origin), allow
+
     if (!origin) return callback(null, true);
-    // Known dev/prod frontends and file:// (origin === 'null')
+
     if (allowedOrigins.has(origin)) return callback(null, true);
     return callback(null, false);
   },

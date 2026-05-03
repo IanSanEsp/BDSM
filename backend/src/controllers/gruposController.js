@@ -3,10 +3,15 @@ import { db } from "../config/db.js";
 // Crear grupo
 export const crearGrupo = async (req, res) => {
   try {
-    const { nombre_grupo, semestre, area_estudio, turno } = req.body || {};
+    const { id_grupo, nombre_grupo, semestre, area_estudio, turno } = req.body || {};
+
+    const idGrupoNum = Number(id_grupo);
+    if (!Number.isInteger(idGrupoNum) || idGrupoNum <= 0) {
+      return res.status(400).json({ error: "Falta id_grupo válido" });
+    }
 
     if (!nombre_grupo || !area_estudio || semestre === undefined || !turno) {
-      return res.status(400).json({ error: "Faltan campos requeridos: nombre_grupo, semestre, area_estudio, turno" });
+      return res.status(400).json({ error: "Faltan campos requeridos: id_grupo, nombre_grupo, semestre, area_estudio, turno" });
     }
 
     const semestreNum = Number(semestre);
@@ -14,14 +19,19 @@ export const crearGrupo = async (req, res) => {
       return res.status(400).json({ error: "semestre inválido" });
     }
 
-    const [result] = await db.query(
-      `INSERT INTO Grupos (nombre_grupo, semestre, area_estudio, turno)
-       VALUES (?, ?, ?, ?)`,
-      [String(nombre_grupo), semestreNum, String(area_estudio), String(turno)]
+    // Validar que no exista
+    const [exist] = await db.query("SELECT id_grupo FROM Grupos WHERE id_grupo = ? LIMIT 1", [idGrupoNum]);
+    if (exist && exist.length > 0) {
+      return res.status(409).json({ error: "El id_grupo ya existe" });
+    }
+
+    await db.query(
+      `INSERT INTO Grupos (id_grupo, nombre_grupo, semestre, area_estudio, turno)
+       VALUES (?, ?, ?, ?, ?)`,
+      [idGrupoNum, String(nombre_grupo), semestreNum, String(area_estudio), String(turno)]
     );
 
-    const id = result.insertId;
-    const [rows] = await db.query("SELECT * FROM Grupos WHERE id_grupo = ? LIMIT 1", [id]);
+    const [rows] = await db.query("SELECT * FROM Grupos WHERE id_grupo = ? LIMIT 1", [idGrupoNum]);
     return res.status(201).json({ message: "Grupo creado", grupo: rows && rows[0] ? rows[0] : null });
   } catch (err) {
     console.error("Error al crear grupo:", err);

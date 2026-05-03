@@ -39,17 +39,19 @@
     <div class="row">
       <div class="col">
         <h3>Registrar usuario</h3>
+        <label>id_usuarios (boleta)<input id="u_id" type="number" /></label>
         <label>Nombre<input id="u_nombre" /></label>
         <label>Correo<input id="u_correo" type="email" /></label>
         <label>Contraseña<input id="u_contrasena" type="password" /></label>
         <label>Turno<select id="u_turno"><option value="Matutino">Matutino</option><option value="Vespertino">Vespertino</option></select></label>
         <label>Tipo (opcional, requiere admin logueado)
           <select id="u_tipo">
-            <option value="">(por defecto Estudiante)</option>
-            <option value="Estudiante">Estudiante</option>
+            <option value="">(por defecto Alumno)</option>
+            <option value="Alumno">Alumno</option>
             <option value="Profesor">Profesor</option>
             <option value="Prefecto de Piso">Prefecto de Piso</option>
             <option value="Prefecto General">Prefecto General</option>
+            <option value="Auxiliar">Auxiliar</option>
           </select>
         </label>
         <button id="btnCrearUsuario">POST /usuarios/registrar</button>
@@ -78,6 +80,7 @@
     <div class="row">
       <div class="col">
         <h3>Crear grupo (admin)</h3>
+        <label>id_grupo<input id="g_id" type="number" min="1" /></label>
         <label>Nombre de grupo<input id="g_nombre" /></label>
         <label>Área de estudio<input id="g_area" /></label>
         <label>Semestre<input id="g_semestre" type="number" min="1" /></label>
@@ -100,16 +103,30 @@
     <div class="row">
       <div class="col">
         <h3>Crear salón (admin)</h3>
-        <label>Número salón<input id="s_numero" /></label>
+        <label>Nombre salón<input id="s_nombre" /></label>
         <label>Piso (0-3)<input id="s_piso" type="number" min="0" max="3" /></label>
-        <label>Capacidad<input id="s_capacidad" type="number" /></label>
-        <label>Tipo<select id="s_tipo"><option value="Aula">Aula</option><option value="Laboratorio">Laboratorio</option><option value="Otro">Otro</option></select></label>
-        <label>Proyector<select id="s_proyector"><option value="false">No</option><option value="true">Sí</option></select></label>
+        <label>Tipo salón<select id="s_tipo_salon"><option value="Salon">Salon</option><option value="Laboratorio">Laboratorio</option></select></label>
+        <label>Estado (opcional)
+          <select id="s_estado">
+            <option value="">(por defecto Disponible)</option>
+            <option value="Disponible">Disponible</option>
+            <option value="Ocupado">Ocupado</option>
+            <option value="Provisional">Provisional</option>
+            <option value="En Mantenimiento">En Mantenimiento</option>
+          </select>
+        </label>
         <button id="btnCrearSalon">POST /salones (admin)</button>
       </div>
       <div class="col">
         <h3>Listar salones</h3>
         <label>Filtro piso (opcional)<input id="s_filtro_piso" type="number" min="0" max="3" /></label>
+        <label>Filtro tipo (opcional)
+          <select id="s_filtro_tipo">
+            <option value="">(cualquiera)</option>
+            <option value="Salon">Salon</option>
+            <option value="Laboratorio">Laboratorio</option>
+          </select>
+        </label>
         <button id="btnListarSalones">GET /salones</button>
       </div>
     </div>
@@ -134,7 +151,7 @@
         <label>Hora inicio (HH:MM)<input id="h_hi" value="07:00" /></label>
         <label>Hora fin (HH:MM)<input id="h_hf" value="08:00" /></label>
         <label>id_materia (según tabla Materias)<input id="h_id_materia" type="number" /></label>
-        <label>Bloque de horario (duración en horas)<input id="h_bloque" type="number" min="1" /></label>
+        <label>Duración (bloques de 50 min)<input id="h_bloque" type="number" min="1" /></label>
         <button id="btnCrearHorario">POST /horarios (admin)</button>
       </div>
       <div class="col">
@@ -164,7 +181,9 @@
     <div class="row">
       <div class="col">
         <h3>Reasignar salón (dinámico, admin)</h3>
-        <label>id_horario_fijo<input id="rd_id_horario" type="number" /></label>
+        <label>id_horario_fijo_detalle (recomendado)<input id="rd_id_detalle" type="number" /></label>
+        <label><small>Si solo tienes id_horario_fijo (catálogo), usa el campo de abajo (menos recomendado)</small></label>
+        <label>id_horario_fijo (catálogo)<input id="rd_id_horario" type="number" /></label>
         <label>Fecha (YYYY-MM-DD)<input id="rd_fecha" /></label>
         <label>id_salon_temporal<input id="rd_id_salon_temporal" type="number" /></label>
         <label>Hora inicio (opcional HH:MM)<input id="rd_hi" /></label>
@@ -174,7 +193,9 @@
       </div>
       <div class="col">
         <h3>Adelantar clase (dinámico, admin)</h3>
-        <label>id_horario_fijo<input id="ac_id_horario" type="number" /></label>
+        <label>id_horario_fijo_detalle (recomendado)<input id="ac_id_detalle" type="number" /></label>
+        <label><small>Si solo tienes id_horario_fijo (catálogo), usa el campo de abajo (menos recomendado)</small></label>
+        <label>id_horario_fijo (catálogo)<input id="ac_id_horario" type="number" /></label>
         <label>Fecha nueva (YYYY-MM-DD)<input id="ac_fecha" /></label>
         <label>Hora inicio nueva (HH:MM)<input id="ac_hi" value="07:00" /></label>
         <label>Hora fin nueva (HH:MM)<input id="ac_hf" value="08:00" /></label>

@@ -5,10 +5,54 @@ import bcrypt from "bcrypt";
 // Joder mi adminisrtrador reaction
 const ADMIN_VALUES = ["admin", "administrador", "adminisrtrador"];
 
+async function resolveCatalogId({ table, idColumn, nameColumn, value }) {
+  if (value === undefined || value === null || value === "") return null;
+
+  // Si ya es número, úsalo directo
+  const asNumber = Number(value);
+  if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) {
+    const [rows] = await db.query(
+      `SELECT ${idColumn} AS id FROM ${table} WHERE ${idColumn} = ? LIMIT 1`,
+      [asNumber]
+    );
+    return rows && rows[0] ? rows[0].id : null;
+  }
+
+  // Si es string, resolver por nombre
+  const [rows] = await db.query(
+    `SELECT ${idColumn} AS id FROM ${table} WHERE ${nameColumn} = ? LIMIT 1`,
+    [String(value)]
+  );
+  return rows && rows[0] ? rows[0].id : null;
+}
+
+async function getTipoUsuarioNombreById(idTipoUsuario) {
+  const [rows] = await db.query(
+    "SELECT nombre_tipo FROM tipo_usuario WHERE id_tipo_usuario = ? LIMIT 1",
+    [idTipoUsuario]
+  );
+  return rows && rows[0] ? rows[0].nombre_tipo : null;
+}
+
+function mapTipoUsuarioToTipoPrefectoNombre(tipoUsuarioNombre) {
+  if (tipoUsuarioNombre === "Prefecto General") return "General";
+  if (tipoUsuarioNombre === "Prefecto de Piso") return "Piso";
+  return null;
+}
+
 export const obtenerUsuarios = async (_req, res) => {
   try {
     const [rows] = await db.query(
-      "SELECT id_usuarios AS id_usuario, nombre, tipo_usuario, correo, turno, activo, id_grupo FROM Usuarios"
+      `SELECT u.id_usuarios AS id_usuario,
+              u.nombre,
+              tu.nombre_tipo AS tipo_usuario,
+              u.correo,
+              u.turno,
+              u.id_grupo,
+              g.nombre_grupo
+       FROM Usuarios u
+       JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
+       LEFT JOIN Grupos g ON u.id_grupo = g.id_grupo`
     );
     res.json(rows);
   } catch (error) {
@@ -20,6 +64,8 @@ export const obtenerUsuarios = async (_req, res) => {
 export const registrarUsuario = async (req, res) => {
   try {
     const {
+      id_usuarios,
+      boleta,
       nombre,
       correo,
       turno,
@@ -30,8 +76,17 @@ export const registrarUsuario = async (req, res) => {
       contrasena
     } = req.body || {};
 
+    const idUsuario = id_usuarios ?? boleta;
+    const idUsuarioNum = Number(idUsuario);
+
+    if (!Number.isInteger(idUsuarioNum) || idUsuarioNum <= 0) {
+      return res.status(400).json({ error: "Falta id_usuarios (o boleta) válido" });
+    }
+
     if (!nombre || !correo || !turno || !contrasena) {
-      return res.status(400).json({ error: "Faltan campos requeridos: nombre, correo, turno y contraseña" });
+      return res
+        .status(400)
+        .json({ error: "Faltan campos requeridos: id_usuarios/boleta, nombre, correo, turno y contraseña" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,15 +103,48 @@ export const registrarUsuario = async (req, res) => {
       return res.status(409).json({ error: "El correo ya está registrado" });
     }
 
-    // Determinar tipo_usuario
-    let tipoUsuario = tipoUsuarioBody || tipo_user || "Estudiante";
+    // Verificar que el id no exista
+    const [existId] = await db.query(
+      "SELECT id_usuarios FROM Usuarios WHERE id_usuarios = ? LIMIT 1",
+      [idUsuarioNum]
+    );
+    if (existId.length > 0) {
+      return res.status(409).json({ error: "El id_usuarios (boleta) ya está registrado" });
+    }
+
+    // Determinar tipo_usuario (catálogo)
+    const tipoUsuarioInput = tipoUsuarioBody || tipo_user || "Alumno";
+    let tipoUsuarioId = await resolveCatalogId({
+      table: "tipo_usuario",
+      idColumn: "id_tipo_usuario",
+      nameColumn: "nombre_tipo",
+      value: tipoUsuarioInput
+    });
+    if (!tipoUsuarioId) {
+      return res.status(400).json({ error: "tipo_usuario inválido (no existe en catálogo tipo_usuario)" });
+    }
+
+    let tipoUsuarioNombre = await getTipoUsuarioNombreById(tipoUsuarioId);
+    if (!tipoUsuarioNombre) {
+      return res.status(400).json({ error: "tipo_usuario inválido" });
+    }
 
     // Si petición autenticada como admin se permite crear Prefecto General
     const reqUser = req.user;
     const isAdminReq = reqUser && ADMIN_VALUES.includes(String(reqUser.tipo || "").toLowerCase());
-    if (!isAdminReq && tipoUsuario === "Prefecto General") {
+    if (!isAdminReq && tipoUsuarioNombre === "Prefecto General") {
       // usuarios normales no pueden ponerse como Prefecto General
-      tipoUsuario = "Estudiante";
+      const fallbackId = await resolveCatalogId({
+        table: "tipo_usuario",
+        idColumn: "id_tipo_usuario",
+        nameColumn: "nombre_tipo",
+        value: "Alumno"
+      });
+      if (!fallbackId) {
+        return res.status(500).json({ error: "Catálogo tipo_usuario incompleto (falta 'Alumno')" });
+      }
+      tipoUsuarioId = fallbackId;
+      tipoUsuarioNombre = "Alumno";
     }
 
     // Validar grupo si viene
@@ -76,25 +164,40 @@ export const registrarUsuario = async (req, res) => {
     const hash = await bcrypt.hash(String(contrasena), saltRounds);
 
     const [result] = await db.query(
-      `INSERT INTO Usuarios (nombre, tipo_usuario, correo, contrasena, turno, activo, id_grupo)
-       VALUES (?, ?, ?, ?, ?, TRUE, ?)`,
-      [nombre, tipoUsuario, correo, hash, turno, idGrupoFinal]
+      `INSERT INTO Usuarios (id_usuarios, nombre, tipo_usuario, correo, \`contraseña\`, turno, id_grupo)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [idUsuarioNum, nombre, tipoUsuarioId, correo, hash, turno, idGrupoFinal]
     );
 
-    const newId = result.insertId;
+    // mysql2 devuelve affectedRows, no insertId (no autoincrement aquí)
+    const newId = idUsuarioNum;
 
     // Crear registros relacionados según rol
-    if (tipoUsuario === "Profesor") {
+    if (tipoUsuarioNombre === "Profesor" || tipoUsuarioNombre === "Auxiliar") {
       await db.query(
-        `INSERT INTO Profesores (id_profesor, tipo_profesor, materia)
-         VALUES (?, ?, ?)` ,
-        [newId, "Profesor", "Sin asignar"]
+        `INSERT INTO Profesores (id_profesor, area_educacion)
+         VALUES (?, ?)` ,
+        [newId, String(req.body?.area_educacion || req.body?.area_estudio || "Sin asignar")]
       );
-    } else if (tipoUsuario === "Prefecto General" || tipoUsuario === "Prefecto de Piso") {
+    } else if (tipoUsuarioNombre === "Prefecto General" || tipoUsuarioNombre === "Prefecto de Piso") {
+      const tipoPrefectoNombre = mapTipoUsuarioToTipoPrefectoNombre(tipoUsuarioNombre);
+      if (!tipoPrefectoNombre) {
+        return res.status(500).json({ error: "No se pudo mapear tipo de prefecto" });
+      }
+      const tipoPrefectoId = await resolveCatalogId({
+        table: "tipo_prefecto",
+        idColumn: "id_tipo_prefecto",
+        nameColumn: "nombre_tipo_prefecto",
+        value: tipoPrefectoNombre
+      });
+      if (!tipoPrefectoId) {
+        return res.status(500).json({ error: "Catálogo tipo_prefecto incompleto" });
+      }
+
       await db.query(
         `INSERT INTO Prefectos (id_prefecto, tipo_prefecto, piso_asignado)
-         VALUES (?, ?, NULL)` ,
-        [newId, tipoUsuario]
+         VALUES (?, ?, NULL)`,
+        [newId, tipoPrefectoId]
       );
     }
 
@@ -103,10 +206,9 @@ export const registrarUsuario = async (req, res) => {
       usuario: {
         id_usuario: newId,
         nombre,
-        tipo_usuario: tipoUsuario,
+        tipo_usuario: tipoUsuarioNombre,
         correo,
         turno,
-        activo: true,
         id_grupo: idGrupoFinal
       }
     });
@@ -136,8 +238,16 @@ export const loginUsuario = async (req, res) => {
     }
 
     const [rows] = await db.query(
-      `SELECT id_usuarios AS id_usuario, nombre, tipo_usuario, correo, contrasena, turno, activo, id_grupo
-       FROM Usuarios WHERE correo = ? LIMIT 1`,
+      `SELECT u.id_usuarios AS id_usuario,
+              u.nombre,
+              tu.nombre_tipo AS tipo_usuario,
+              u.correo,
+              u.\`contraseña\` AS contrasena_hash,
+              u.turno,
+              u.id_grupo
+       FROM Usuarios u
+       JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
+       WHERE u.correo = ? LIMIT 1`,
       [correo]
     );
 
@@ -146,11 +256,8 @@ export const loginUsuario = async (req, res) => {
     }
 
     const user = rows[0];
-    if (!user.activo) {
-      return res.status(403).json({ error: "Usuario inactivo" });
-    }
 
-    const okPass = await bcrypt.compare(String(contrasena), String(user.contrasena));
+    const okPass = await bcrypt.compare(String(contrasena), String(user.contrasena_hash));
     if (!okPass) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
@@ -179,7 +286,6 @@ export const loginUsuario = async (req, res) => {
         tipo_usuario: user.tipo_usuario,
         correo: user.correo,
         turno: user.turno,
-        activo: user.activo,
         id_grupo: user.id_grupo
       }
     });
@@ -199,8 +305,8 @@ export const actualizarUsuario = async (req, res) => {
       correo,
       turno,
       tipo_usuario,
-      activo,
-      id_grupo
+      id_grupo,
+      contrasena
     } = req.body || {};
 
     const fields = [];
@@ -215,11 +321,29 @@ export const actualizarUsuario = async (req, res) => {
       fields.push("correo = ?"); values.push(correo);
     }
     if (turno !== undefined) { fields.push("turno = ?"); values.push(turno); }
-    if (tipo_usuario !== undefined) { fields.push("tipo_usuario = ?"); values.push(tipo_usuario); }
-    if (activo !== undefined) { fields.push("activo = ?"); values.push(!!activo); }
+    if (tipo_usuario !== undefined) {
+      const tipoId = await resolveCatalogId({
+        table: "tipo_usuario",
+        idColumn: "id_tipo_usuario",
+        nameColumn: "nombre_tipo",
+        value: tipo_usuario
+      });
+      if (!tipoId) {
+        return res.status(400).json({ error: "tipo_usuario inválido (no existe en catálogo tipo_usuario)" });
+      }
+      fields.push("tipo_usuario = ?");
+      values.push(tipoId);
+    }
     if (id_grupo !== undefined) { fields.push("id_grupo = ?"); values.push(id_grupo === null ? null : Number(id_grupo)); }
 
-    // Se usa boleta como secreto porq obviamente
+    if (contrasena !== undefined && String(contrasena).length > 0) {
+      if (String(contrasena).length < 8) {
+        return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
+      }
+      const hash = await bcrypt.hash(String(contrasena), 10);
+      fields.push("`contraseña` = ?");
+      values.push(hash);
+    }
 
     if (fields.length === 0) {
       return res.status(400).json({ error: "No hay cambios a aplicar" });
@@ -232,7 +356,15 @@ export const actualizarUsuario = async (req, res) => {
     }
 
     const [rows] = await db.query(
-      "SELECT id_usuarios AS id_usuario, nombre, tipo_usuario, correo, turno, activo, id_grupo FROM Usuarios WHERE id_usuarios = ? LIMIT 1",
+      `SELECT u.id_usuarios AS id_usuario,
+              u.nombre,
+              tu.nombre_tipo AS tipo_usuario,
+              u.correo,
+              u.turno,
+              u.id_grupo
+       FROM Usuarios u
+       JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
+       WHERE u.id_usuarios = ? LIMIT 1`,
       [id]
     );
     return res.json({ message: "Usuario actualizado", usuario: rows && rows[0] ? rows[0] : null });
@@ -258,7 +390,7 @@ export const eliminarUsuario = async (req, res) => {
   }
 };
 
-// Asignar prefecto de piso
+// RF.RU.07: asignar prefecto de piso
 export const asignarPrefectoPiso = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -267,24 +399,42 @@ export const asignarPrefectoPiso = async (req, res) => {
       return res.status(400).json({ error: "Faltan id_usuario o piso_asignado" });
     }
 
-    // Verificar que el usuario sea prefecto
-    const [uRows] = await db.query(
-      "SELECT tipo_usuario FROM Usuarios WHERE id_usuarios = ? LIMIT 1",
+    const [rows] = await db.query(
+      `SELECT u.id_usuarios AS id_usuario,
+              tu.nombre_tipo AS tipo_usuario
+       FROM Usuarios u
+       JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
+       WHERE u.id_usuarios = ? LIMIT 1`,
       [id]
     );
-    if (!uRows || uRows.length === 0) {
+    if (!rows || rows.length === 0) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
-    const tipoUsuario = uRows[0].tipo_usuario;
-    if (tipoUsuario !== "Prefecto General" && tipoUsuario !== "Prefecto de Piso") {
+
+    const tipoUsuarioNombre = rows[0].tipo_usuario;
+    if (tipoUsuarioNombre !== "Prefecto General" && tipoUsuarioNombre !== "Prefecto de Piso") {
       return res.status(400).json({ error: "El usuario no es prefecto" });
+    }
+
+    const tipoPrefectoNombre = mapTipoUsuarioToTipoPrefectoNombre(tipoUsuarioNombre);
+    if (!tipoPrefectoNombre) {
+      return res.status(500).json({ error: "No se pudo mapear tipo de prefecto" });
+    }
+    const tipoPrefectoId = await resolveCatalogId({
+      table: "tipo_prefecto",
+      idColumn: "id_tipo_prefecto",
+      nameColumn: "nombre_tipo_prefecto",
+      value: tipoPrefectoNombre
+    });
+    if (!tipoPrefectoId) {
+      return res.status(500).json({ error: "Catálogo tipo_prefecto incompleto" });
     }
 
     await db.query(
       `INSERT INTO Prefectos (id_prefecto, tipo_prefecto, piso_asignado)
        VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE tipo_prefecto = VALUES(tipo_prefecto), piso_asignado = VALUES(piso_asignado)`,
-      [id, tipoUsuario, piso_asignado]
+      [id, tipoPrefectoId, Number(piso_asignado)]
     );
 
     return res.json({ message: "Prefecto de piso asignado" });

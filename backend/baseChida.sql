@@ -81,13 +81,16 @@ CREATE TABLE Materias (
 
 CREATE TABLE horarios (
     id_horario_fijo INT PRIMARY KEY AUTO_INCREMENT,
+    id_grupo INT NOT NULL UNIQUE,
     nombre_horario VARCHAR(100) NOT NULL
+    ,CONSTRAINT fk_horario_grupo
+        FOREIGN KEY (id_grupo) REFERENCES Grupos(id_grupo)
 );
 
 
 CREATE TABLE Horario_Fijo (
-    id_horario_fijo INT PRIMARY KEY,
-    id_grupo INT NOT NULL,
+    id_horario_fijo_detalle INT PRIMARY KEY AUTO_INCREMENT,
+    id_horario_fijo INT NOT NULL,
     id_materia INT NOT NULL,
     id_profesor INT NOT NULL,
     id_auxiliar INT NULL,
@@ -98,8 +101,6 @@ CREATE TABLE Horario_Fijo (
     bloque_horario INT NOT NULL,
     constraint fk_hf_horario
         FOREIGN KEY (id_horario_fijo) REFERENCES horarios(id_horario_fijo),
-    CONSTRAINT fk_hf_grupo
-        FOREIGN KEY (id_grupo) REFERENCES Grupos(id_grupo),
     CONSTRAINT fk_hf_profesor
         FOREIGN KEY (id_profesor) REFERENCES Profesores(id_profesor),
     CONSTRAINT fk_hf_auxiliar
@@ -114,7 +115,9 @@ CREATE TABLE Horario_Fijo (
 CREATE TABLE Horario_Dinamico (
     id_horario_dinamico INT PRIMARY KEY AUTO_INCREMENT,
     id_horario_fijo INT NOT NULL,
+    id_horario_fijo_detalle INT NOT NULL,
     fecha DATE NOT NULL,
+    dia VARCHAR(20) NOT NULL,
     id_salon_temporal INT NOT NULL,
     hora_inicio TIME NOT NULL,
     hora_fin TIME NOT NULL,
@@ -122,7 +125,9 @@ CREATE TABLE Horario_Dinamico (
     bloque_horario INT NOT NULL,
     persona_autoriza INT NOT NULL,
     CONSTRAINT fk_hd_hf
-        FOREIGN KEY (id_horario_fijo) REFERENCES Horario_Fijo(id_horario_fijo),
+        FOREIGN KEY (id_horario_fijo) REFERENCES horarios(id_horario_fijo),
+    CONSTRAINT fk_hd_hf_detalle
+        FOREIGN KEY (id_horario_fijo_detalle) REFERENCES Horario_Fijo(id_horario_fijo_detalle),
     CONSTRAINT fk_hd_salon
         FOREIGN KEY (id_salon_temporal) REFERENCES Salones(id_salon),
     CONSTRAINT fk_hd_usuario

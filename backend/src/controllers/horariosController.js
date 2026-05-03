@@ -2,6 +2,71 @@ import { db } from "../config/db.js";
 
 const DIAS = new Set(["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]);
 
+const DIAS_POR_NUMERO = [
+  null,
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  null
+];
+
+const _columnCache = new Map();
+
+async function tableHasColumn(tableName, columnName) {
+  const key = `${tableName}.${columnName}`;
+  if (_columnCache.has(key)) return _columnCache.get(key);
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  const has = !!(rows && rows[0] && Number(rows[0].cnt) > 0);
+  _columnCache.set(key, has);
+  return has;
+}
+
+function diaDesdeFecha(fechaYYYYMMDD) {
+  // Interpretar fecha como calendario local (sin TZ) para evitar corrimientos.
+  const parts = String(fechaYYYYMMDD).split("-").map(Number);
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  const dia = DIAS_POR_NUMERO[dt.getDay()];
+  return dia && DIAS.has(dia) ? dia : null;
+}
+
+async function getOrCreateHorarioIdByGrupo(id_grupo, nombre_horario) {
+  const [rows] = await db.query(
+    "SELECT id_horario_fijo FROM horarios WHERE id_grupo = ? LIMIT 1",
+    [id_grupo]
+  );
+  if (rows && rows[0]) return rows[0].id_horario_fijo;
+
+  const nombre =
+    nombre_horario && String(nombre_horario).trim().length > 0
+      ? String(nombre_horario).trim()
+      : `Horario Grupo ${id_grupo}`;
+
+  // Compatibilidad: algunas BD antiguas tienen `grupo_horario` NOT NULL sin default.
+  const hasGrupoHorario = await tableHasColumn("horarios", "grupo_horario");
+  const [ins] = hasGrupoHorario
+    ? await db.query(
+        "INSERT INTO horarios (id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?)",
+        [id_grupo, id_grupo, nombre]
+      )
+    : await db.query(
+        "INSERT INTO horarios (id_grupo, nombre_horario) VALUES (?, ?)",
+        [id_grupo, nombre]
+      );
+  return ins.insertId;
+}
+
 function validarHoraHHMM(h) {
   return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(h));
 }
@@ -13,7 +78,17 @@ function toTimeWithSeconds(h) {
 // Registrar horario chido en horario fijo
 export const crearHorario = async (req, res) => {
   try {
-    const { id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario } = req.body || {};
+    const {
+      id_grupo,
+      id_profesor,
+      id_salon,
+      dia,
+      hora_inicio,
+      hora_fin,
+      id_materia,
+      bloque_horario,
+      nombre_horario
+    } = req.body || {};
 
     if (!id_grupo || !id_profesor || !id_salon || !dia || !hora_inicio || !hora_fin || !id_materia || bloque_horario === undefined) {
       return res.status(400).json({ error: "Faltan campos requeridos: id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario" });
@@ -51,13 +126,19 @@ export const crearHorario = async (req, res) => {
     if (!sRows || sRows.length === 0) return res.status(400).json({ error: "Salón no encontrado" });
     if (!mRows || mRows.length === 0) return res.status(400).json({ error: "Materia no encontrada" });
 
-    // Validar las colisiones
+    await db.beginTransaction();
+    try {
+      // 1 horario (catálogo) por grupo: obtener o crear el id compartido
+      const idHorarioFijo = await getOrCreateHorarioIdByGrupo(Number(id_grupo), nombre_horario);
+
+      // Validar las colisiones dentro del horario del grupo
     const [colGrupo] = await db.query(
       `SELECT COUNT(*) AS cnt FROM Horario_Fijo
-       WHERE id_grupo = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
-      [id_grupo, dia, hiSQL, hfSQL]
+       WHERE id_horario_fijo = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
+      [idHorarioFijo, dia, hiSQL, hfSQL]
     );
     if (colGrupo[0].cnt > 0) {
+      await db.rollback();
       return res.status(409).json({ error: "Colisión: el grupo ya tiene horario en ese bloque" });
     }
 
@@ -67,6 +148,7 @@ export const crearHorario = async (req, res) => {
       [id_profesor, dia, hiSQL, hfSQL]
     );
     if (colProf[0].cnt > 0) {
+      await db.rollback();
       return res.status(409).json({ error: "Colisión: el profesor ya tiene horario en ese bloque" });
     }
 
@@ -76,16 +158,36 @@ export const crearHorario = async (req, res) => {
       [id_salon, dia, hiSQL, hfSQL]
     );
     if (colSalon[0].cnt > 0) {
+      await db.rollback();
       return res.status(409).json({ error: "Colisión: el salón ya tiene horario en ese bloque" });
     }
 
-    await db.query(
-      `INSERT INTO Horario_Fijo (id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, bloque_horario, id_materia)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id_grupo, id_profesor, id_salon, dia, hiSQL, hfSQL, bloqueNum, id_materia]
-    );
+      const [insHF] = await db.query(
+        `INSERT INTO Horario_Fijo (
+           id_horario_fijo,
+           id_materia,
+           id_profesor,
+           id_auxiliar,
+           id_salon,
+           dia,
+           hora_inicio,
+           hora_fin,
+           bloque_horario
+         )
+         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+        [idHorarioFijo, id_materia, id_profesor, id_salon, dia, hiSQL, hfSQL, bloqueNum]
+      );
 
-    return res.status(201).json({ message: "Horario fijo creado" });
+      await db.commit();
+      return res.status(201).json({
+        message: "Horario fijo creado",
+        id_horario_fijo: idHorarioFijo,
+        id_horario_fijo_detalle: insHF.insertId
+      });
+    } catch (txErr) {
+      await db.rollback();
+      throw txErr;
+    }
   } catch (err) {
     console.error("Error al crear horario fijo:", err);
     return res.status(500).json({ error: "Error interno del servidor" });
@@ -96,12 +198,24 @@ export const crearHorario = async (req, res) => {
 export const listarHorarios = async (req, res) => {
   try {
         const { id_grupo, id_profesor, materia, id_salon } = req.query || {};
-        let sql = `SELECT hf.*, g.nombre_grupo, g.semestre, g.turno AS turno_grupo,
+        let sql = `SELECT hf.id_horario_fijo_detalle,
+           hf.id_horario_fijo,
+           h.id_grupo,
+           hf.id_materia,
+           hf.id_profesor,
+           hf.id_auxiliar,
+           hf.id_salon,
+           hf.dia,
+           hf.hora_inicio,
+           hf.hora_fin,
+           hf.bloque_horario,
+           g.nombre_grupo, g.semestre, g.turno AS turno_grupo,
            u.nombre AS nombre_profesor,
-           s.numero_salon,
+           s.nombre_salon,
            m.nombre_materia AS materia, m.area_estudio
          FROM Horario_Fijo hf
-         JOIN Grupos g ON hf.id_grupo = g.id_grupo
+         JOIN horarios h ON hf.id_horario_fijo = h.id_horario_fijo
+         JOIN Grupos g ON h.id_grupo = g.id_grupo
          JOIN Profesores pr ON hf.id_profesor = pr.id_profesor
          JOIN Usuarios u ON pr.id_profesor = u.id_usuarios
          JOIN Salones s ON hf.id_salon = s.id_salon
@@ -109,7 +223,7 @@ export const listarHorarios = async (req, res) => {
          WHERE 1=1`;
     const params = [];
 
-    if (id_grupo) { sql += " AND hf.id_grupo = ?"; params.push(Number(id_grupo)); }
+    if (id_grupo) { sql += " AND h.id_grupo = ?"; params.push(Number(id_grupo)); }
     if (id_profesor) { sql += " AND hf.id_profesor = ?"; params.push(Number(id_profesor)); }
     if (materia) { sql += " AND m.nombre_materia LIKE ?"; params.push(`%${materia}%`); }
     if (id_salon) { sql += " AND hf.id_salon = ?"; params.push(Number(id_salon)); }
@@ -127,9 +241,9 @@ export const listarHorarios = async (req, res) => {
 export const actualizarHorario = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "Falta id_horario_fijo" });
+    if (!id) return res.status(400).json({ error: "Falta id" });
 
-    const { id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, materia, id_materia, bloque_horario } = req.body || {};
+    const { id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario } = req.body || {};
 
     const fields = [];
     const values = [];
@@ -149,7 +263,6 @@ export const actualizarHorario = async (req, res) => {
       if (!validarHoraHHMM(hora_fin)) return res.status(400).json({ error: "Formato de hora_fin inválido" });
       fields.push("hora_fin = ?"); values.push(toTimeWithSeconds(hora_fin));
     }
-    if (materia !== undefined) { fields.push("materia = ?"); values.push(String(materia)); }
     if (id_materia !== undefined) { fields.push("id_materia = ?"); values.push(Number(id_materia)); }
     if (bloque_horario !== undefined) { fields.push("bloque_horario = ?"); values.push(Number(bloque_horario)); }
 
@@ -157,13 +270,41 @@ export const actualizarHorario = async (req, res) => {
       return res.status(400).json({ error: "No hay cambios a aplicar" });
     }
 
-    values.push(id);
-    const [result] = await db.query(`UPDATE Horario_Fijo SET ${fields.join(", ")} WHERE id_horario_fijo = ?`, values);
+    // Intentar actualizar por PK detalle; si no existe, tratar :id como id_horario_fijo (catálogo) y
+    // ubicar el registro por (dia, bloque_horario).
+    let idDetalle = id;
+    const [foundDetalle] = await db.query(
+      "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+      [id]
+    );
+    if (!foundDetalle || foundDetalle.length === 0) {
+      const diaTarget = dia !== undefined ? String(dia) : null;
+      const bloqueTarget = bloque_horario !== undefined ? Number(bloque_horario) : null;
+      if (!diaTarget || !bloqueTarget) {
+        return res.status(400).json({
+          error: "Cuando :id es id_horario_fijo (catálogo), debes enviar dia y bloque_horario para identificar el registro"
+        });
+      }
+      const [row] = await db.query(
+        "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo = ? AND dia = ? AND bloque_horario = ? LIMIT 1",
+        [id, diaTarget, bloqueTarget]
+      );
+      if (!row || row.length === 0) {
+        return res.status(404).json({ error: "Horario no encontrado" });
+      }
+      idDetalle = row[0].id_horario_fijo_detalle;
+    }
+
+    values.push(idDetalle);
+    const [result] = await db.query(
+      `UPDATE Horario_Fijo SET ${fields.join(", ")} WHERE id_horario_fijo_detalle = ?`,
+      values
+    );
     if (!result || result.affectedRows === 0) {
       return res.status(404).json({ error: "Horario no encontrado" });
     }
 
-    const [rows] = await db.query("SELECT * FROM Horario_Fijo WHERE id_horario_fijo = ? LIMIT 1", [id]);
+    const [rows] = await db.query("SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1", [idDetalle]);
     return res.json({ message: "Horario actualizado", horario: rows && rows[0] ? rows[0] : null });
   } catch (err) {
     console.error("Error al actualizar horario fijo:", err);
@@ -175,9 +316,33 @@ export const actualizarHorario = async (req, res) => {
 export const eliminarHorario = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "Falta id_horario_fijo" });
+    if (!id) return res.status(400).json({ error: "Falta id" });
 
-    const [result] = await db.query("DELETE FROM Horario_Fijo WHERE id_horario_fijo = ?", [id]);
+    // Igual que actualizar: intentar por detalle, si no existe, tratar como catálogo y requerir dia+bloque.
+    let idDetalle = id;
+    const [foundDetalle] = await db.query(
+      "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+      [id]
+    );
+    if (!foundDetalle || foundDetalle.length === 0) {
+      const diaTarget = req.body?.dia ?? req.query?.dia;
+      const bloqueTarget = req.body?.bloque_horario ?? req.query?.bloque_horario;
+      if (!diaTarget || !bloqueTarget) {
+        return res.status(400).json({
+          error: "Cuando :id es id_horario_fijo (catálogo), debes enviar dia y bloque_horario para identificar el registro"
+        });
+      }
+      const [row] = await db.query(
+        "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo = ? AND dia = ? AND bloque_horario = ? LIMIT 1",
+        [id, String(diaTarget), Number(bloqueTarget)]
+      );
+      if (!row || row.length === 0) {
+        return res.status(404).json({ error: "Horario no encontrado" });
+      }
+      idDetalle = row[0].id_horario_fijo_detalle;
+    }
+
+    const [result] = await db.query("DELETE FROM Horario_Fijo WHERE id_horario_fijo_detalle = ?", [idDetalle]);
     if (result && result.affectedRows === 0) {
       return res.status(404).json({ error: "Horario no encontrado" });
     }
@@ -205,9 +370,17 @@ export const buscarPorBloque = async (req, res) => {
     const hf = toTimeWithSeconds(hora_fin);
 
     const [rows] = await db.query(
-      `SELECT hf.*, g.nombre_grupo, u.nombre AS nombre_profesor, s.numero_salon
+      `SELECT hf.id_horario_fijo_detalle,
+              hf.id_horario_fijo,
+              h.id_grupo,
+              hf.dia,
+              hf.hora_inicio,
+              hf.hora_fin,
+              hf.bloque_horario,
+              g.nombre_grupo, u.nombre AS nombre_profesor, s.nombre_salon
        FROM Horario_Fijo hf
-       JOIN Grupos g ON hf.id_grupo = g.id_grupo
+       JOIN horarios h ON hf.id_horario_fijo = h.id_horario_fijo
+       JOIN Grupos g ON h.id_grupo = g.id_grupo
        JOIN Profesores p ON hf.id_profesor = p.id_profesor
        JOIN Usuarios u ON p.id_profesor = u.id_usuarios
        JOIN Salones s ON hf.id_salon = s.id_salon
@@ -232,9 +405,45 @@ export const reasignarSalon = async (req, res) => {
       return res.status(400).json({ error: "Faltan id_horario_fijo, fecha o id_salon_temporal" });
     }
 
-    const [hfRows] = await db.query("SELECT * FROM Horario_Fijo WHERE id_horario_fijo = ? LIMIT 1", [id]);
-    if (!hfRows || hfRows.length === 0) return res.status(404).json({ error: "Horario fijo no encontrado" });
-    const hf = hfRows[0];
+    const diaFecha = diaDesdeFecha(fecha);
+    if (!diaFecha) {
+      return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
+    }
+
+    // :id puede ser id_horario_fijo_detalle (PK) o id_horario_fijo (catálogo)
+    let hf = null;
+    const [hfByDetalle] = await db.query(
+      "SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+      [id]
+    );
+    if (hfByDetalle && hfByDetalle[0]) {
+      hf = hfByDetalle[0];
+    } else {
+      // tratar como catálogo: ubicar la clase del día por bloque o por hora
+      const bloqueTarget = req.body?.bloque_horario !== undefined ? Number(req.body.bloque_horario) : null;
+      const hiTarget = hora_inicio ? toTimeWithSeconds(hora_inicio) : null;
+      const hfTarget = hora_fin ? toTimeWithSeconds(hora_fin) : null;
+
+      let sql = "SELECT * FROM Horario_Fijo WHERE id_horario_fijo = ? AND dia = ?";
+      const params = [id, diaFecha];
+      if (bloqueTarget) {
+        sql += " AND bloque_horario = ?";
+        params.push(bloqueTarget);
+      } else if (hiTarget && hfTarget) {
+        sql += " AND NOT (hora_fin <= ? OR hora_inicio >= ?)";
+        params.push(hiTarget, hfTarget);
+      }
+      sql += " ORDER BY hora_inicio";
+
+      const [rows] = await db.query(sql, params);
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ error: "Horario fijo no encontrado para esa fecha" });
+      }
+      if (rows.length > 1 && !bloqueTarget && !(hiTarget && hfTarget)) {
+        return res.status(400).json({ error: "Ambiguo: manda bloque_horario o hora_inicio/hora_fin para identificar la clase" });
+      }
+      hf = rows[0];
+    }
 
     const hi = hora_inicio ? toTimeWithSeconds(hora_inicio) : hf.hora_inicio;
     const hfTime = hora_fin ? toTimeWithSeconds(hora_fin) : hf.hora_fin;
@@ -242,24 +451,31 @@ export const reasignarSalon = async (req, res) => {
       return res.status(400).json({ error: "Formato de hora inválido" });
     }
 
+    const diaDin = hf.dia || diaFecha;
+
     // Antes de crear un nuevo registro dinámico, eliminar cualquier registro previo
-    // para este mismo horario fijo y fecha, de modo que solo exista el último cambio.
+    // para esta misma clase (detalle) en esa fecha: último cambio gana.
     await db.query(
-      "DELETE FROM Horario_Dinamico WHERE id_horario_fijo = ? AND fecha = ?",
-      [id, fecha]
+      "DELETE FROM Horario_Dinamico WHERE id_horario_fijo_detalle = ? AND fecha = ?",
+      [hf.id_horario_fijo_detalle, fecha]
     );
 
     // Validar que salón temporal exista
     const [sRows] = await db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [id_salon_temporal]);
     if (!sRows || sRows.length === 0) return res.status(400).json({ error: "Salón temporal no encontrado" });
 
-    // Verificar colisión en el salón temporal
+    // Verificar colisión real (considerando dinámicos como override del fijo) en el salón temporal
     const [col] = await db.query(
       `SELECT COUNT(*) AS cnt
-       FROM Horario_Dinamico hd
-       JOIN Horario_Fijo hf2 ON hd.id_horario_fijo = hf2.id_horario_fijo
-       WHERE hd.id_salon_temporal = ? AND hd.fecha = ? AND NOT (hd.hora_fin <= ? OR hd.hora_inicio >= ?)` ,
-      [id_salon_temporal, fecha, hi, hfTime]
+       FROM Horario_Fijo hf2
+       LEFT JOIN Horario_Dinamico hd2
+         ON hd2.id_horario_fijo_detalle = hf2.id_horario_fijo_detalle
+        AND hd2.fecha = ?
+       WHERE hf2.dia = ?
+         AND COALESCE(hd2.id_salon_temporal, hf2.id_salon) = ?
+         AND NOT (COALESCE(hd2.hora_fin, hf2.hora_fin) <= ? OR COALESCE(hd2.hora_inicio, hf2.hora_inicio) >= ?)
+         AND hf2.id_horario_fijo_detalle <> ?`,
+      [fecha, diaDin, Number(id_salon_temporal), hi, hfTime, hf.id_horario_fijo_detalle]
     );
     if (col[0].cnt > 0) {
       return res.status(409).json({ error: "Colisión: el salón temporal ya tiene horario en ese bloque" });
@@ -274,9 +490,31 @@ export const reasignarSalon = async (req, res) => {
     const bloque = Number(hf.bloque_horario) || null;
 
     const [ins] = await db.query(
-      `INSERT INTO Horario_Dinamico (id_horario_fijo, fecha, id_salon_temporal, hora_inicio, hora_fin, motivo_cambio, bloque_horario, persona_autoriza)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, fecha, id_salon_temporal, hi, hfTime, motivoFinal, bloque, autorizadoPor]
+      `INSERT INTO Horario_Dinamico (
+         id_horario_fijo,
+         id_horario_fijo_detalle,
+         fecha,
+         dia,
+         id_salon_temporal,
+         hora_inicio,
+         hora_fin,
+         motivo_cambio,
+         bloque_horario,
+         persona_autoriza
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        hf.id_horario_fijo,
+        hf.id_horario_fijo_detalle,
+        fecha,
+        diaDin,
+        id_salon_temporal,
+        hi,
+        hfTime,
+        motivoFinal,
+        bloque,
+        autorizadoPor
+      ]
     );
 
     const [nuevo] = await db.query("SELECT * FROM Horario_Dinamico WHERE id_horario_dinamico = ? LIMIT 1", [ins.insertId]);
@@ -309,17 +547,44 @@ export const adelantarClase = async (req, res) => {
       return res.status(400).json({ error: "hora_fin debe ser posterior a hora_inicio" });
     }
 
-    const [hfRows] = await db.query("SELECT * FROM Horario_Fijo WHERE id_horario_fijo = ? LIMIT 1", [id]);
-    if (!hfRows || hfRows.length === 0) return res.status(404).json({ error: "Horario fijo no encontrado" });
-    const hf = hfRows[0];
+    const diaFecha = diaDesdeFecha(fecha);
+    if (!diaFecha) {
+      return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
+    }
+
+    // :id puede ser id_horario_fijo_detalle (PK) o id_horario_fijo (catálogo)
+    let hf = null;
+    const [hfByDetalle] = await db.query(
+      "SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+      [id]
+    );
+    if (hfByDetalle && hfByDetalle[0]) {
+      hf = hfByDetalle[0];
+    } else {
+      const bloqueTarget = req.body?.bloque_horario !== undefined ? Number(req.body.bloque_horario) : null;
+      let sql = "SELECT * FROM Horario_Fijo WHERE id_horario_fijo = ? AND dia = ?";
+      const params = [id, diaFecha];
+      if (bloqueTarget) {
+        sql += " AND bloque_horario = ?";
+        params.push(bloqueTarget);
+      }
+      sql += " ORDER BY hora_inicio";
+      const [rows] = await db.query(sql, params);
+      if (!rows || rows.length === 0) return res.status(404).json({ error: "Horario fijo no encontrado para esa fecha" });
+      if (rows.length > 1 && !bloqueTarget) {
+        return res.status(400).json({ error: "Ambiguo: manda bloque_horario para identificar la clase" });
+      }
+      hf = rows[0];
+    }
 
     const salonDestino = id_salon_temporal ? Number(id_salon_temporal) : Number(hf.id_salon);
 
-    // Igual que en reasignarSalon: si ya existe un dinámico para este horario fijo y fecha,
-    // se elimina para reemplazarlo por el nuevo.
+    const diaDin = hf.dia || diaFecha;
+
+    // Igual que en reasignarSalon: se reemplaza el cambio de esta clase (detalle)
     await db.query(
-      "DELETE FROM Horario_Dinamico WHERE id_horario_fijo = ? AND fecha = ?",
-      [id, fecha]
+      "DELETE FROM Horario_Dinamico WHERE id_horario_fijo_detalle = ? AND fecha = ?",
+      [hf.id_horario_fijo_detalle, fecha]
     );
 
     const [sRows] = await db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [salonDestino]);
@@ -327,10 +592,15 @@ export const adelantarClase = async (req, res) => {
 
     const [col] = await db.query(
       `SELECT COUNT(*) AS cnt
-       FROM Horario_Dinamico hd
-       JOIN Horario_Fijo hf2 ON hd.id_horario_fijo = hf2.id_horario_fijo
-       WHERE hd.id_salon_temporal = ? AND hd.fecha = ? AND NOT (hd.hora_fin <= ? OR hd.hora_inicio >= ?)`,
-      [salonDestino, fecha, hi, hfTime]
+       FROM Horario_Fijo hf2
+       LEFT JOIN Horario_Dinamico hd2
+         ON hd2.id_horario_fijo_detalle = hf2.id_horario_fijo_detalle
+        AND hd2.fecha = ?
+       WHERE hf2.dia = ?
+         AND COALESCE(hd2.id_salon_temporal, hf2.id_salon) = ?
+         AND NOT (COALESCE(hd2.hora_fin, hf2.hora_fin) <= ? OR COALESCE(hd2.hora_inicio, hf2.hora_inicio) >= ?)
+         AND hf2.id_horario_fijo_detalle <> ?`,
+      [fecha, diaDin, salonDestino, hi, hfTime, hf.id_horario_fijo_detalle]
     );
     if (col[0].cnt > 0) {
       return res.status(409).json({ error: "Colisión: el salón ya tiene horario dinámico en ese bloque" });
@@ -345,9 +615,31 @@ export const adelantarClase = async (req, res) => {
     const bloque = Number(hf.bloque_horario) || null;
 
     const [ins] = await db.query(
-      `INSERT INTO Horario_Dinamico (id_horario_fijo, fecha, id_salon_temporal, hora_inicio, hora_fin, motivo_cambio, bloque_horario, persona_autoriza)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, fecha, salonDestino, hi, hfTime, motivoFinal, bloque, autorizadoPor]
+      `INSERT INTO Horario_Dinamico (
+         id_horario_fijo,
+         id_horario_fijo_detalle,
+         fecha,
+         dia,
+         id_salon_temporal,
+         hora_inicio,
+         hora_fin,
+         motivo_cambio,
+         bloque_horario,
+         persona_autoriza
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        hf.id_horario_fijo,
+        hf.id_horario_fijo_detalle,
+        fecha,
+        diaDin,
+        salonDestino,
+        hi,
+        hfTime,
+        motivoFinal,
+        bloque,
+        autorizadoPor
+      ]
     );
 
     const [nuevo] = await db.query("SELECT * FROM Horario_Dinamico WHERE id_horario_dinamico = ? LIMIT 1", [ins.insertId]);
@@ -364,29 +656,37 @@ export const tablaDinamicaPorFecha = async (req, res) => {
     const { fecha, piso } = req.query || {};
     if (!fecha) return res.status(400).json({ error: "Falta fecha" });
 
+    const diaFecha = diaDesdeFecha(fecha);
+    if (!diaFecha) {
+      return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
+    }
+
     let sql = `SELECT hf.id_horario_fijo, hf.dia, hf.hora_inicio, hf.hora_fin, hf.bloque_horario,
                       g.nombre_grupo, u.nombre AS nombre_profesor,
                       m.nombre_materia AS materia, m.area_estudio,
-                      s.id_salon, s.numero_salon, s.piso,
-                      hd.id_horario_dinamico, hd.id_salon_temporal, s2.numero_salon AS numero_salon_temporal,
+                      s.id_salon, s.nombre_salon, s.piso,
+                      hd.id_horario_dinamico, hd.id_salon_temporal, s2.nombre_salon AS nombre_salon_temporal,
                       hd.hora_inicio AS hora_inicio_temp, hd.hora_fin AS hora_fin_temp, hd.motivo_cambio AS motivo
                FROM Horario_Fijo hf
-               JOIN Grupos g ON hf.id_grupo = g.id_grupo
+               JOIN horarios h ON hf.id_horario_fijo = h.id_horario_fijo
+               JOIN Grupos g ON h.id_grupo = g.id_grupo
                JOIN Profesores p ON hf.id_profesor = p.id_profesor
                JOIN Usuarios u ON p.id_profesor = u.id_usuarios
                JOIN Materias m ON hf.id_materia = m.id_materia
                JOIN Salones s ON hf.id_salon = s.id_salon
-               LEFT JOIN Horario_Dinamico hd ON hd.id_horario_fijo = hf.id_horario_fijo AND hd.fecha = ?
+               LEFT JOIN Horario_Dinamico hd
+                 ON hd.id_horario_fijo_detalle = hf.id_horario_fijo_detalle
+                AND hd.fecha = ?
                LEFT JOIN Salones s2 ON hd.id_salon_temporal = s2.id_salon
-               WHERE 1=1`;
-    const params = [fecha];
+               WHERE hf.dia = ?`;
+    const params = [fecha, diaFecha];
 
     if (piso !== undefined) {
       sql += " AND s.piso = ?";
       params.push(Number(piso));
     }
 
-    sql += " ORDER BY s.piso, s.numero_salon, FIELD(hf.dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hf.hora_inicio";
+    sql += " ORDER BY s.piso, s.nombre_salon, FIELD(hf.dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hf.hora_inicio";
     const [rows] = await db.query(sql, params);
     return res.json({ tabla: rows });
   } catch (err) {

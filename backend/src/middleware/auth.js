@@ -49,3 +49,21 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// Permite Prefecto General o Prefecto de Piso (para operaciones que requieren autorización, no CRUD admin)
+export function requirePrefecto(req, res, next) {
+  const u = req.user;
+  if (!u) return res.status(401).json({ error: "No autenticado" });
+
+  // Si ya viene como admin, pasa
+  const val = String(u.tipo || "").toLowerCase();
+  const adminValues = ["admin", "administrador", "adminisrtrador"];
+  if (adminValues.includes(val)) return next();
+
+  const tipoUsuario = String(u.tipoUsuario || "");
+  if (tipoUsuario === "Prefecto General" || tipoUsuario === "Prefecto de Piso") {
+    return next();
+  }
+
+  return res.status(403).json({ error: "Requiere ser Prefecto" });
+}

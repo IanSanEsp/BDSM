@@ -9,7 +9,7 @@ import {
 	adelantarClase,
 	tablaDinamicaPorFecha
 } from "../controllers/horariosController.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requirePrefecto } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -23,8 +23,8 @@ router.delete("/:id", requireAuth, requireAdmin, eliminarHorario);
 router.get("/por-bloque", buscarPorBloque);
 
 // Operación del horario dinámico
-router.post("/:id/reasignar-salon", requireAuth, requireAdmin, reasignarSalon);
-router.post("/:id/adelantar-clase", requireAuth, requireAdmin, adelantarClase);
+router.post("/:id/reasignar-salon", requireAuth, requirePrefecto, reasignarSalon);
+router.post("/:id/adelantar-clase", requireAuth, requirePrefecto, adelantarClase);
 router.get("/tabla-dinamica", requireAuth, tablaDinamicaPorFecha);
 
 export default router;

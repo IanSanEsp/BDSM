@@ -35,7 +35,13 @@
 
   // Usuarios
   $("btnCrearUsuario").addEventListener("click", async () => {
+    const idUsuarios = Number($("u_id").value);
+    if (!Number.isInteger(idUsuarios) || idUsuarios <= 0) {
+      appendLog("WARN", "id_usuarios (boleta) inválido");
+      return;
+    }
     const body = {
+      id_usuarios: idUsuarios,
       nombre: $("u_nombre").value,
       correo: $("u_correo").value,
       contrasena: $("u_contrasena").value,
@@ -82,7 +88,13 @@
 
   // Grupos
   $("btnCrearGrupo").addEventListener("click", async () => {
+    const idGrupo = Number($("g_id").value);
+    if (!Number.isInteger(idGrupo) || idGrupo <= 0) {
+      appendLog("WARN", "id_grupo inválido");
+      return;
+    }
     const body = {
+      id_grupo: idGrupo,
       nombre_grupo: $("g_nombre").value,
       area_estudio: $("g_area").value,
       semestre: $("g_semestre").value,
@@ -108,13 +120,18 @@
 
   // Salones
   $("btnCrearSalon").addEventListener("click", async () => {
+    const pisoVal = Number($("s_piso").value);
+    if (!Number.isInteger(pisoVal) || pisoVal < 0 || pisoVal > 3) {
+      appendLog("WARN", "piso inválido (0-3)");
+      return;
+    }
     const body = {
-      numero_salon: $("s_numero").value,
-      piso: $("s_piso").value,
-      capacidad: $("s_capacidad").value,
-      tipo: $("s_tipo").value,
-      proyector: $("s_proyector").value === "true",
+      nombre_salon: $("s_nombre").value,
+      piso: pisoVal,
+      tipo_salon: $("s_tipo_salon").value,
     };
+    const estado = $("s_estado").value;
+    if (estado) body.estado = estado;
     const res = await api("/salones", { method:"POST", body, auth:true });
     $("outSalones").textContent = JSON.stringify(res, null, 2);
     appendLog("POST /salones", res);
@@ -124,6 +141,8 @@
     const params = new URLSearchParams();
     const piso = $("s_filtro_piso").value;
     if (piso !== "") params.set("piso", piso);
+    const tipo = $("s_filtro_tipo").value;
+    if (tipo) params.set("tipo_salon", tipo);
     const res = await api("/salones" + (params.toString() ? `?${params}` : ""), { method:"GET", auth:false });
     $("outSalones").textContent = JSON.stringify(res, null, 2);
     appendLog("GET /salones", res);
@@ -190,7 +209,13 @@
   });
 
   $("btnReasignarSalon").addEventListener("click", async () => {
-    const id = Number($("rd_id_horario").value);
+    const idDetalle = Number($("rd_id_detalle").value);
+    const idCatalogo = Number($("rd_id_horario").value);
+    const id = idDetalle || idCatalogo;
+    if (!Number.isInteger(id) || id <= 0) {
+      appendLog("WARN", "id inválido: usa id_horario_fijo_detalle o id_horario_fijo");
+      return;
+    }
     const body = {
       fecha: $("rd_fecha").value,
       id_salon_temporal: Number($("rd_id_salon_temporal").value),
@@ -207,7 +232,13 @@
   });
 
   $("btnAdelantarClase").addEventListener("click", async () => {
-    const id = Number($("ac_id_horario").value);
+    const idDetalle = Number($("ac_id_detalle").value);
+    const idCatalogo = Number($("ac_id_horario").value);
+    const id = idDetalle || idCatalogo;
+    if (!Number.isInteger(id) || id <= 0) {
+      appendLog("WARN", "id inválido: usa id_horario_fijo_detalle o id_horario_fijo");
+      return;
+    }
     const body = {
       fecha: $("ac_fecha").value,
       hora_inicio: $("ac_hi").value,
