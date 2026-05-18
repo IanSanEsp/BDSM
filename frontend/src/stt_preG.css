@@ -1,0 +1,220 @@
+@import url('hor_preG.css');
+
+.area-contenido-perfil {
+  flex: 1;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.tarjeta {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--color-superficie-alta);
+  box-shadow: var(--sombra-sm);
+}
+
+/*  Cabecera de perfil  */
+.tarjeta-cabecera-perfil {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 32px;
+}
+
+.avatar-grande {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  background-color: var(--color-primario-oscuro);
+  color: white;
+  font-family: var(--fuente-encabezado);
+  font-size: 2.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nombre-perfil-grande {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primario-oscuro);
+  margin-bottom: 4px;
+}
+
+.rol-perfil-grande {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-sobre-superficie);
+  margin-bottom: 8px;
+}
+
+.correo-perfil-grande {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Sección de información  */
+.tarjeta-info-perfil {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.campos-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 48px;
+}
+
+.campo-vista,
+.campo-edicion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.etiqueta-campo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.valor-campo {
+  background: var(--color-superficie-baja);
+  border: 1px solid var(--color-superficie-alta);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--color-sobre-superficie);
+  min-height: 40px;
+}
+
+.input-perfil {
+  background: white;
+  border: 1px solid var(--color-superficie-alta);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: var(--fuente-cuerpo);
+  color: var(--color-sobre-superficie);
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.input-perfil:focus {
+  border-color: var(--color-primario);
+}
+
+.acciones-info-perfil {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.boton-editar-perfil {
+  padding: 10px 20px;
+  border: 1px solid var(--color-superficie-alta);
+  background: white;
+  border-radius: 8px;
+  font-family: var(--fuente-cuerpo);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.boton-editar-perfil:hover {
+  background: var(--color-superficie-baja);
+  border-color: #d1d5db;
+}
+
+.boton-guardar-perfil {
+  padding: 10px 20px;
+  background: var(--color-primario-oscuro);
+  border: none;
+  border-radius: 8px;
+  font-family: var(--fuente-cuerpo);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.boton-guardar-perfil:hover {
+  background: var(--color-primario);
+}
+
+.oculto {
+  display: none !important;
+}
+
+.tarjeta-contrasena-perfil {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.titulo-seccion-perfil {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-sobre-superficie);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: var(--fuente-encabezado);
+}
+
+.campo-contrasena {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campos-contrasena-nuevas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 48px;
+}
+
+.boton-guardar-contrasena {
+  width: 100%;
+  padding: 14px;
+  background: var(--color-primario-oscuro);
+  border: none;
+  border-radius: 8px;
+  font-family: var(--fuente-cuerpo);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.boton-guardar-contrasena:hover {
+  background: var(--color-primario);
+}
+
+#menu-perfil-usuario {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  transform: none;
+  margin-top: 8px;
+  z-index: 1000;
+  min-width: 160px;
+}

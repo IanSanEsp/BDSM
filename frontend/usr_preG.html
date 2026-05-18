@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Usuarios - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/usr_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="usr_preG.html" class="enlace-nav activo">
+                <span class="material-symbols-outlined md-20">person</span>
+                <span>Usuarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="contenido-principal">
+        <header class="cabecera">
+          <div class="titulo-pagina"><h1 class="fuente-encabezado" style="font-size: 1.5rem; font-weight: 800;">Usuarios</h1></div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto General</p>
+                </div>
+                <div class="avatar">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="area-contenido area-contenido-usuarios">
+          <div class="contenedor-usuarios">
+
+            <!-- Panel izquierdo: lista -->
+            <div class="panel-lista">
+              <div class="barra-acciones-usr">
+                <div class="barra-busqueda-contenedor">
+                  <span class="material-symbols-outlined md-20" style="color:#9ca3af;flex-shrink:0;">search</span>
+                  <input type="text" id="campo-busqueda" class="campo-busqueda-usr" placeholder="Ej: 2024090010" />
+                  <div class="contenedor-menu-kebab">
+                    <button class="boton-icono" id="boton-kebab-usr">
+                      <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                    <div class="menu-desplegable" id="menu-kebab-usr">
+                      <button class="opcion-menu" id="opcion-filtro">
+                        <span class="material-symbols-outlined md-18">filter_list</span>
+                        <span>Filtros</span>
+                      </button>
+                      <button class="opcion-menu" id="opcion-borrar-registros">
+                        <span class="material-symbols-outlined md-18">delete</span>
+                        <span>Borrar registros</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="total-usuarios-contenedor">
+                  <span class="total-usuarios-label">Total Usuarios:</span>
+                  <span class="total-usuarios-numero" id="total-usuarios-numero">0</span>
+                </div>
+                <div class="nuevo-registro-wrapper" style="position:relative;">
+                  <button class="boton-nuevo-registro" id="boton-nuevo-registro">
+                    <span class="material-symbols-outlined md-20">add</span>
+                    Nuevo Registro
+                  </button>
+                  <div class="menu-desplegable" id="menu-nuevo-registro">
+                    <button class="opcion-menu" id="opcion-importar-excel-usr">
+                      <span class="material-symbols-outlined md-18">upload_file</span>
+                      <span>Importar Excel</span>
+                    </button>
+                    <button class="opcion-menu" id="opcion-registro-manual-usr">
+                      <span class="material-symbols-outlined md-18">edit_note</span>
+                      <span>Registro Manual</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="contenedor-lista-usuarios">
+                <table class="tabla-usuarios">
+                  <thead>
+                    <tr>
+                      <th>USUARIO</th>
+                      <th>CORREO</th>
+                      <th>ROL</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cuerpo-tabla-usuarios">
+                    <!-- llenado por JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Panel derecho: detalle -->
+            <div class="panel-detalle" id="panel-detalle-usuario">
+              <div class="panel-detalle-vacio">
+                <span class="material-symbols-outlined" style="font-size:48px;color:#d1d5db;">person</span>
+                <p>Selecciona un usuario</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTURA GENERAL DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Modal de Confirmación Borrar -->
+    <div id="modal-confirmacion-usr" class="modal-overlay">
+      <div class="modal-contenido">
+        <div class="modal-icono-advertencia">
+          <span class="material-symbols-outlined md-48">warning</span>
+        </div>
+        <h2>¿Estás seguro?</h2>
+        <p>Esta acción borrará todos los registros. Esta operación no se puede deshacer.</p>
+        <div class="modal-acciones">
+          <button id="cancelar-borrado-usr" class="boton-secundario">Cancelar</button>
+          <button id="confirmar-borrado-usr" class="boton-peligro">Borrar registros</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Confirmación Eliminar Usuario -->
+    <div id="modal-eliminar-usuario" class="modal-overlay">
+      <div class="modal-contenido">
+        <div class="modal-icono-advertencia">
+          <span class="material-symbols-outlined md-48">warning</span>
+        </div>
+        <h2>¿Estás seguro?</h2>
+        <p>Esta acción borrará el usuario seleccionado. Esta operación no se puede deshacer.</p>
+        <div class="modal-acciones">
+          <button id="cancelar-eliminar-usuario" class="boton-secundario">Cancelar</button>
+          <button id="confirmar-eliminar-usuario" class="boton-peligro">Eliminar usuario</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Confirmación Borrar Registros (Kebab) -->
+    <div id="modal-borrar-registros" class="modal-overlay">
+      <div class="modal-contenido">
+        <div class="modal-icono-advertencia">
+          <span class="material-symbols-outlined md-48">warning</span>
+        </div>
+        <h2>¿Estás seguro?</h2>
+        <p>Esta acción borrará todos los registros. Esta operación no se puede deshacer.</p>
+        <div class="modal-acciones">
+          <button id="cancelar-borrar-registros" class="boton-secundario">Cancelar</button>
+          <button id="confirmar-borrar-registros" class="boton-peligro">Borrar registros</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Registro Manual de Usuario -->
+    <div id="modal-registro-usuario" class="modal-overlay">
+      <div class="modal-contenido modal-grande" style="max-width:480px;">
+        <div class="modal-cabecera">
+          <h2>Registrar Usuario</h2>
+          <button id="cerrar-modal-registro-usuario" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo">
+          <form class="formulario-registro" id="form-registro-usuario">
+            <div class="campo-formulario">
+              <label>ID / Boleta</label>
+              <input type="text" id="reg-usr-id" required placeholder="Ej: 2024090010" />
+            </div>
+            <div class="campo-formulario">
+              <label>Nombre</label>
+              <input type="text" id="reg-usr-nombre" required placeholder="Nombre completo" />
+            </div>
+            <div class="campo-formulario">
+              <label>Correo</label>
+              <input type="email" id="reg-usr-correo" required placeholder="correo@ejemplo.mx" />
+            </div>
+            <div class="campo-formulario">
+              <label>Contraseña</label>
+              <input type="password" id="reg-usr-contrasena" required />
+            </div>
+            <div class="campo-formulario">
+              <label>Tipo</label>
+              <select id="reg-usr-tipo" required>
+                <option value="">Seleccionar Tipo</option>
+                <option value="Prefecto General">Prefecto General</option>
+                <option value="Prefecto de Piso">Prefecto de Piso</option>
+                <option value="Alumno">Alumno</option>
+                <option value="Profesor">Profesor</option>
+                <option value="Auxiliar">Auxiliar</option>
+              </select>
+            </div>
+            <div class="campo-formulario" id="reg-usr-turno-container">
+              <label>Turno</label>
+              <select id="reg-usr-turno">
+                <option value="">Seleccionar Turno</option>
+                <option value="Matutino">Matutino</option>
+                <option value="Vespertino">Vespertino</option>
+              </select>
+            </div>
+            <div class="campo-formulario oculto" id="reg-usr-piso-container">
+              <label>Piso</label>
+              <select id="reg-usr-piso">
+                <option value="">Seleccionar Piso</option>
+                <option value="0">L</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </div>
+            <div class="campo-formulario oculto" id="reg-usr-grupo-container">
+              <label>Grupo</label>
+              <select id="reg-usr-grupo">
+                <option value="">Seleccionar Grupo</option>
+              </select>
+            </div>
+            <button type="submit" class="boton-registro">Guardar Usuario</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="src/usr_preG.js"></script>
+  </body>
+</html>

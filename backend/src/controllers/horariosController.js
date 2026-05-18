@@ -1,12 +1,12 @@
 import { db } from "../config/db.js";
 
-const DIAS = new Set(["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]);
+const DIAS = new Set(["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"]);
 
 const DIAS_POR_NUMERO = [
   null,
   "Lunes",
   "Martes",
-  "Miércoles",
+  "Miercoles",
   "Jueves",
   "Viernes",
   null
@@ -31,7 +31,7 @@ async function tableHasColumn(tableName, columnName) {
 }
 
 function diaDesdeFecha(fechaYYYYMMDD) {
-  // Interpretar fecha como calendario local (sin TZ) para evitar corrimientos.
+  // Interpretar fecha como calendario local para evitar corrimientos (jodete railway y sus servers gringos)
   const parts = String(fechaYYYYMMDD).split("-").map(Number);
   if (parts.length !== 3) return null;
   const [y, m, d] = parts;
@@ -53,7 +53,7 @@ async function getOrCreateHorarioIdByGrupo(id_grupo, nombre_horario) {
       ? String(nombre_horario).trim()
       : `Horario Grupo ${id_grupo}`;
 
-  // Compatibilidad: algunas BD antiguas tienen `grupo_horario` NOT NULL sin default.
+
   const hasGrupoHorario = await tableHasColumn("horarios", "grupo_horario");
   const [ins] = hasGrupoHorario
     ? await db.query(
@@ -81,6 +81,8 @@ export const crearHorario = async (req, res) => {
     const {
       id_grupo,
       id_profesor,
+      id_auxiliar,
+      id_profesor_aux,
       id_salon,
       dia,
       hora_inicio,
@@ -89,6 +91,9 @@ export const crearHorario = async (req, res) => {
       bloque_horario,
       nombre_horario
     } = req.body || {};
+
+    const auxRaw = id_auxiliar ?? id_profesor_aux ?? null;
+    const auxId = auxRaw === '' || auxRaw === undefined ? null : auxRaw;
 
     if (!id_grupo || !id_profesor || !id_salon || !dia || !hora_inicio || !hora_fin || !id_materia || bloque_horario === undefined) {
       return res.status(400).json({ error: "Faltan campos requeridos: id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario" });
@@ -115,20 +120,22 @@ export const crearHorario = async (req, res) => {
       return res.status(400).json({ error: "bloque_horario inválido" });
     }
 
-    const [[gRows], [pRows], [sRows], [mRows]] = await Promise.all([
+    const [[gRows], [pRows], [sRows], [mRows], [auxRows]] = await Promise.all([
       db.query("SELECT id_grupo FROM Grupos WHERE id_grupo = ? LIMIT 1", [id_grupo]),
       db.query("SELECT id_profesor FROM Profesores WHERE id_profesor = ? LIMIT 1", [id_profesor]),
       db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [id_salon]),
-      db.query("SELECT id_materia FROM Materias WHERE id_materia = ? LIMIT 1", [id_materia])
+      db.query("SELECT id_materia FROM Materias WHERE id_materia = ? LIMIT 1", [id_materia]),
+      auxId ? db.query("SELECT id_profesor FROM Profesores WHERE id_profesor = ? LIMIT 1", [auxId]) : Promise.resolve([[]])
     ]);
     if (!gRows || gRows.length === 0) return res.status(400).json({ error: "Grupo no encontrado" });
     if (!pRows || pRows.length === 0) return res.status(400).json({ error: "Profesor no encontrado" });
     if (!sRows || sRows.length === 0) return res.status(400).json({ error: "Salón no encontrado" });
     if (!mRows || mRows.length === 0) return res.status(400).json({ error: "Materia no encontrada" });
+    if (auxId && (!auxRows || auxRows.length === 0)) return res.status(400).json({ error: "Profesor auxiliar no encontrado" });
 
     await db.beginTransaction();
     try {
-      // 1 horario (catálogo) por grupo: obtener o crear el id compartido
+      //obtener o crear el id compartido (catalogo)
       const idHorarioFijo = await getOrCreateHorarioIdByGrupo(Number(id_grupo), nombre_horario);
 
       // Validar las colisiones dentro del horario del grupo
@@ -150,6 +157,18 @@ export const crearHorario = async (req, res) => {
     if (colProf[0].cnt > 0) {
       await db.rollback();
       return res.status(409).json({ error: "Colisión: el profesor ya tiene horario en ese bloque" });
+    }
+
+    if (auxId) {
+      const [colAux] = await db.query(
+        `SELECT COUNT(*) AS cnt FROM Horario_Fijo
+         WHERE id_auxiliar = ? AND dia = ? AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
+        [auxId, dia, hiSQL, hfSQL]
+      );
+      if (colAux[0].cnt > 0) {
+        await db.rollback();
+        return res.status(409).json({ error: "Colisión: el profesor auxiliar ya tiene horario en ese bloque" });
+      }
     }
 
     const [colSalon] = await db.query(
@@ -174,8 +193,8 @@ export const crearHorario = async (req, res) => {
            hora_fin,
            bloque_horario
          )
-         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
-        [idHorarioFijo, id_materia, id_profesor, id_salon, dia, hiSQL, hfSQL, bloqueNum]
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idHorarioFijo, id_materia, id_profesor, auxId ? Number(auxId) : null, id_salon, dia, hiSQL, hfSQL, bloqueNum]
       );
 
       await db.commit();
@@ -191,6 +210,29 @@ export const crearHorario = async (req, res) => {
   } catch (err) {
     console.error("Error al crear horario fijo:", err);
     return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// Catálogo: todos los profesores (aunque no tengan horarios)
+export const listarProfesoresCatalogo = async (_req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT p.id_profesor,
+              u.nombre
+       FROM Profesores p
+       LEFT JOIN Usuarios u ON u.id_usuarios = p.id_profesor
+       ORDER BY (u.nombre IS NULL) ASC, u.nombre ASC, p.id_profesor ASC`
+    );
+
+    const profesores = (rows || []).map((r) => ({
+      id_profesor: r.id_profesor,
+      nombre: r.nombre || null
+    }));
+
+    return res.json({ profesores });
+  } catch (err) {
+    console.error('Error al listar profesores:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
@@ -211,15 +253,18 @@ export const listarHorarios = async (req, res) => {
            hf.bloque_horario,
            g.nombre_grupo, g.semestre, g.turno AS turno_grupo,
            u.nombre AS nombre_profesor,
+           uaux.nombre AS nombre_auxiliar,
            s.nombre_salon,
            m.nombre_materia AS materia, m.area_estudio
          FROM Horario_Fijo hf
          JOIN horarios h ON hf.id_horario_fijo = h.id_horario_fijo
-         JOIN Grupos g ON h.id_grupo = g.id_grupo
-         JOIN Profesores pr ON hf.id_profesor = pr.id_profesor
-         JOIN Usuarios u ON pr.id_profesor = u.id_usuarios
-         JOIN Salones s ON hf.id_salon = s.id_salon
-         JOIN Materias m ON hf.id_materia = m.id_materia
+         LEFT JOIN Grupos g ON h.id_grupo = g.id_grupo
+         LEFT JOIN Materias m ON hf.id_materia = m.id_materia
+         LEFT JOIN Salones s ON hf.id_salon = s.id_salon
+         LEFT JOIN Profesores pr ON hf.id_profesor = pr.id_profesor
+         LEFT JOIN Usuarios u ON pr.id_profesor = u.id_usuarios
+         LEFT JOIN Profesores praux ON hf.id_auxiliar = praux.id_profesor
+         LEFT JOIN Usuarios uaux ON praux.id_profesor = uaux.id_usuarios
          WHERE 1=1`;
     const params = [];
 
@@ -228,7 +273,7 @@ export const listarHorarios = async (req, res) => {
     if (materia) { sql += " AND m.nombre_materia LIKE ?"; params.push(`%${materia}%`); }
     if (id_salon) { sql += " AND hf.id_salon = ?"; params.push(Number(id_salon)); }
 
-    sql += " ORDER BY FIELD(hf.dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hf.hora_inicio";
+    sql += " ORDER BY FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio";
     const [rows] = await db.query(sql, params);
     res.json({ horarios: rows });
   } catch (err) {
@@ -243,13 +288,17 @@ export const actualizarHorario = async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Falta id" });
 
-    const { id_grupo, id_profesor, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario } = req.body || {};
+    const { id_grupo, id_profesor, id_profesor_aux, id_salon, dia, hora_inicio, hora_fin, id_materia, bloque_horario } = req.body || {};
 
     const fields = [];
     const values = [];
 
-    if (id_grupo !== undefined) { fields.push("id_grupo = ?"); values.push(Number(id_grupo)); }
     if (id_profesor !== undefined) { fields.push("id_profesor = ?"); values.push(Number(id_profesor)); }
+    if (id_profesor_aux !== undefined) { 
+      const auxVal = id_profesor_aux === null || id_profesor_aux === '' ? null : Number(id_profesor_aux);
+      fields.push("id_auxiliar = ?"); 
+      values.push(auxVal); 
+    }
     if (id_salon !== undefined) { fields.push("id_salon = ?"); values.push(Number(id_salon)); }
     if (dia !== undefined) {
       if (!DIAS.has(String(dia))) return res.status(400).json({ error: "día inválido" });
@@ -265,10 +314,6 @@ export const actualizarHorario = async (req, res) => {
     }
     if (id_materia !== undefined) { fields.push("id_materia = ?"); values.push(Number(id_materia)); }
     if (bloque_horario !== undefined) { fields.push("bloque_horario = ?"); values.push(Number(bloque_horario)); }
-
-    if (fields.length === 0) {
-      return res.status(400).json({ error: "No hay cambios a aplicar" });
-    }
 
     // Intentar actualizar por PK detalle; si no existe, tratar :id como id_horario_fijo (catálogo) y
     // ubicar el registro por (dia, bloque_horario).
@@ -295,6 +340,25 @@ export const actualizarHorario = async (req, res) => {
       idDetalle = row[0].id_horario_fijo_detalle;
     }
 
+    // id_grupo no está en Horario_Fijo, está en horarios (catálogo)
+    if (id_grupo !== undefined && Number(id_grupo) > 0) {
+      const [currRow] = await db.query(
+        "SELECT id_horario_fijo FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+        [idDetalle]
+      );
+      if (currRow && currRow[0]) {
+        const nuevoIdHorarioFijo = await getOrCreateHorarioIdByGrupo(Number(id_grupo));
+        if (nuevoIdHorarioFijo !== currRow[0].id_horario_fijo) {
+          fields.push("id_horario_fijo = ?");
+          values.push(nuevoIdHorarioFijo);
+        }
+      }
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "No hay cambios a aplicar" });
+    }
+
     values.push(idDetalle);
     const [result] = await db.query(
       `UPDATE Horario_Fijo SET ${fields.join(", ")} WHERE id_horario_fijo_detalle = ?`,
@@ -302,6 +366,26 @@ export const actualizarHorario = async (req, res) => {
     );
     if (!result || result.affectedRows === 0) {
       return res.status(404).json({ error: "Horario no encontrado" });
+    }
+
+    // Si se cambió el profesor, aplicar el mismo cambio a todos los horarios
+    // del mismo grupo y la misma materia
+    if (id_profesor !== undefined) {
+      const materiaTarget = id_materia !== undefined ? Number(id_materia) : null;
+      const [hfRow] = await db.query(
+        "SELECT id_horario_fijo FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
+        [idDetalle]
+      );
+      if (materiaTarget && hfRow && hfRow[0]) {
+        await db.query(
+          `UPDATE Horario_Fijo
+           SET id_profesor = ?
+           WHERE id_horario_fijo = ?
+             AND id_materia = ?
+             AND id_horario_fijo_detalle != ?`,
+          [Number(id_profesor), hfRow[0].id_horario_fijo, materiaTarget, idDetalle]
+        );
+      }
     }
 
     const [rows] = await db.query("SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1", [idDetalle]);
@@ -686,7 +770,7 @@ export const tablaDinamicaPorFecha = async (req, res) => {
       params.push(Number(piso));
     }
 
-    sql += " ORDER BY s.piso, s.nombre_salon, FIELD(hf.dia,'Lunes','Martes','Miércoles','Jueves','Viernes'), hf.hora_inicio";
+    sql += " ORDER BY s.piso, s.nombre_salon, FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio";
     const [rows] = await db.query(sql, params);
     return res.json({ tabla: rows });
   } catch (err) {

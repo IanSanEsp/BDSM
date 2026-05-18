@@ -49,10 +49,15 @@ export const obtenerUsuarios = async (_req, res) => {
               u.correo,
               u.turno,
               u.id_grupo,
-              g.nombre_grupo
+              g.nombre_grupo,
+              p.piso_asignado,
+              prof.area_educacion,
+              prof.estado_asistencia
        FROM Usuarios u
        JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
-       LEFT JOIN Grupos g ON u.id_grupo = g.id_grupo`
+       LEFT JOIN Grupos g ON u.id_grupo = g.id_grupo
+       LEFT JOIN Prefectos p ON p.id_prefecto = u.id_usuarios
+       LEFT JOIN Profesores prof ON prof.id_profesor = u.id_usuarios`
     );
     res.json(rows);
   } catch (error) {
@@ -160,8 +165,9 @@ export const registrarUsuario = async (req, res) => {
       }
     }
 
-    const saltRounds = 10;
-    const hash = await bcrypt.hash(String(contrasena), saltRounds);
+    const saltRounds = Number(process.env.BCRYPT_COST || 10);
+    const safeRounds = Number.isFinite(saltRounds) && saltRounds >= 4 ? saltRounds : 10;
+    const hash = await bcrypt.hash(String(contrasena), safeRounds);
 
     const [result] = await db.query(
       `INSERT INTO Usuarios (id_usuarios, nombre, tipo_usuario, correo, \`contraseña\`, turno, id_grupo)
@@ -257,6 +263,7 @@ export const loginUsuario = async (req, res) => {
 
     const user = rows[0];
 
+    // Solo bcrypt (la BD debe tener hashes)
     const okPass = await bcrypt.compare(String(contrasena), String(user.contrasena_hash));
     if (!okPass) {
       return res.status(401).json({ error: "Credenciales inválidas" });
@@ -294,6 +301,7 @@ export const loginUsuario = async (req, res) => {
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
 
 export const actualizarUsuario = async (req, res) => {
   try {
@@ -340,7 +348,9 @@ export const actualizarUsuario = async (req, res) => {
       if (String(contrasena).length < 8) {
         return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
       }
-      const hash = await bcrypt.hash(String(contrasena), 10);
+      const saltRounds = Number(process.env.BCRYPT_COST || 10);
+      const safeRounds = Number.isFinite(saltRounds) && saltRounds >= 4 ? saltRounds : 10;
+      const hash = await bcrypt.hash(String(contrasena), safeRounds);
       fields.push("`contraseña` = ?");
       values.push(hash);
     }

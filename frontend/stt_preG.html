@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Perfil - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/stt_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="usr_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">person</span>
+                <span>Usuarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="contenido-principal">
+        <header class="cabecera">
+          <div class="titulo-pagina">
+            <h1 class="fuente-encabezado" style="font-size: 1.5rem; font-weight: 800;">Usuario</h1>
+          </div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto General</p>
+                </div>
+                <div class="avatar">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="area-contenido area-contenido-perfil">
+
+          <!-- Tarjeta de cabecera de perfil -->
+          <div class="tarjeta tarjeta-cabecera-perfil">
+            <div class="avatar-grande">EW</div>
+            <div class="info-cabecera-perfil">
+              <h2 class="fuente-encabezado nombre-perfil-grande">El Wenaz</h2>
+              <p class="rol-perfil-grande">Prefecto General</p>
+              <p class="correo-perfil-grande">ewenaz2420@cecyt9.mx</p>
+            </div>
+          </div>
+
+          <!-- Tarjeta de información editable -->
+          <div class="tarjeta tarjeta-info-perfil">
+            <!-- Modo vista -->
+            <div id="vista-info" class="campos-info-grid">
+              <div class="campo-vista">
+                <span class="etiqueta-campo">NOMBRE COMPLETO</span>
+                <div class="valor-campo" id="vista-nombre">El Wenaz</div>
+              </div>
+              <div class="campo-vista">
+                <span class="etiqueta-campo">BOLETA</span>
+                <div class="valor-campo" id="vista-boleta">2024090666</div>
+              </div>
+              <div class="campo-vista">
+                <span class="etiqueta-campo">CORREO INSTITUCIONAL</span>
+                <div class="valor-campo" id="vista-correo">ewenaz2420@cecyt9.mx</div>
+              </div>
+              <div class="campo-vista">
+                <span class="etiqueta-campo">TURNO</span>
+                <div class="valor-campo" id="vista-turno">Vespertino</div>
+              </div>
+            </div>
+            <!-- Modo edición -->
+            <div id="edicion-info" class="campos-info-grid oculto">
+              <div class="campo-edicion">
+                <span class="etiqueta-campo">NOMBRE COMPLETO</span>
+                <input type="text" id="edit-nombre" value="El Wenaz" class="input-perfil">
+              </div>
+              <div class="campo-edicion">
+                <span class="etiqueta-campo">BOLETA</span>
+                <input type="text" id="edit-boleta" value="2024090666" class="input-perfil" disabled>
+              </div>
+              <div class="campo-edicion">
+                <span class="etiqueta-campo">CORREO INSTITUCIONAL</span>
+                <input type="email" id="edit-correo" value="ewenaz2420@cecyt9.mx" class="input-perfil">
+              </div>
+              <div class="campo-edicion">
+                <span class="etiqueta-campo">TURNO</span>
+                <select id="edit-turno" class="input-perfil">
+                  <option value="Matutino">Matutino</option>
+                  <option value="Vespertino" selected>Vespertino</option>
+                </select>
+              </div>
+            </div>
+            <div class="acciones-info-perfil">
+              <button id="btn-editar-info" class="boton-editar-perfil">Editar Información</button>
+              <button id="btn-guardar-info" class="boton-guardar-perfil">Guardar Cambios</button>
+            </div>
+          </div>
+
+          <!-- Tarjeta de cambio de contraseña -->
+          <div class="tarjeta tarjeta-contrasena-perfil">
+            <h3 class="titulo-seccion-perfil">
+              <span class="material-symbols-outlined md-20">lock_reset</span>
+              CAMBIAR CONTRASEÑA
+            </h3>
+            <div class="campo-contrasena">
+              <label class="etiqueta-campo">Contraseña Actual</label>
+              <input type="password" class="input-perfil" placeholder="••••••••••••">
+            </div>
+            <div class="campos-contrasena-nuevas">
+              <div class="campo-contrasena">
+                <label class="etiqueta-campo">Nueva Contraseña</label>
+                <input type="password" class="input-perfil" placeholder="••••••••••••">
+              </div>
+              <div class="campo-contrasena">
+                <label class="etiqueta-campo">Confirmar</label>
+                <input type="password" class="input-perfil" placeholder="••••••••••••">
+              </div>
+            </div>
+            <button class="boton-guardar-contrasena">Guardar Cambios</button>
+          </div>
+
+        </div>
+
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTURA GENERAL DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="src/stt_preG.js"></script>
+  </body>
+</html>

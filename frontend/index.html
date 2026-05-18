@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iniciar Sesión - B D S M</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/login.css">
+  </head>
+  <body>
+    <main class="pantalla-login">
+      <div class="tarjeta-login">
+        <!-- Lateral Izquierdo (Info) -->
+        <div class="login-lateral-izquierdo">
+          <div class="login-info-superior">
+            <div class="login-logo-principal">
+              <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo">
+              <div class="login-logo-texto">
+                <h2>B D S M</h2>
+                <p>SPACE MANAGER</p>
+              </div>
+            </div>
+            <h1 class="login-titulo-bienvenida">Control de Espacios Institucionales</h1>
+            <p class="login-descripcion">
+              Bienvenido al sistema de gestión de espacios del CECyT 9 "Juan de Dios Bátiz". 
+              Administra salones y laboratorios de forma rápida y sencilla en un solo lugar. 
+              Consulta horarios en tiempo real, visualiza la disponibilidad de espacios y mantén el control de las actividades del plantel.
+            </p>
+          </div>
+
+          <div class="login-logos-partners">
+            <img src="src/img/logo/voxlabs.png" alt="Voximon Labs" class="partner-logo-principal">
+            <div class="partner-logos-secundarios">
+              <img src="src/img/logo/escudocecyt9.png" alt="CECyT 9" class="partner-logo-secundario">
+              <img src="src/img/logo/ipn.png" alt="IPN" class="partner-logo-secundario">
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario -->
+        <div class="login-formulario-contenedor">
+          <h3>Iniciar Sesión</h3>
+          <p class="login-subtitulo">Ingrese sus credenciales institucionales</p>
+
+          <form id="login-form" class="login-form">
+            <div class="campo-login">
+              <label for="email">
+                <span class="material-symbols-outlined md-18">alternate_email</span>
+                Correo Electrónico
+              </label>
+              <input type="email" id="email" placeholder="usuario@ipn.mx" required>
+            </div>
+
+            <div class="campo-login">
+              <label for="password">
+                <span class="material-symbols-outlined md-18">lock</span>
+                Contraseña
+              </label>
+              <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="boton-login">
+              <span>Iniciar Sesión</span>
+              <span class="material-symbols-outlined md-18">arrow_forward</span>
+            </button>
+
+            <p id="login-error" class="login-error" role="alert" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+
+      <footer class="login-footer">
+        <p>© 2026 CECyT 9 "Juan de Dios Bátiz" - © 2026 Voximon Labs</p>
+        <div class="login-footer-links">
+          <span>Aviso de Privacidad</span>
+          <span>Términos de Servicio</span>
+        </div>
+      </footer>
+    </main>
+
+    <script type="module" src="src/login.js"></script>
+  </body>
+</html>

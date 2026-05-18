@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mapa - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/map_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+      <!-- Navbar -->
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preG.html" class="enlace-nav activo">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="usr_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">person</span>
+                <span>Usuarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preG.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside> 
+
+      <!-- Content -->
+      <main class="contenido-principal">
+        <header class="cabecera">
+          <div class="titulo-pagina">
+            <h1 class="fuente-encabezado" style="font-size: 1.5rem; font-weight: 800;">Mapa Interactivo</h1>
+          </div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto General</p>
+                </div>
+                <div class="avatar">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="layout-mapa">
+          <aside class="panel-lateral-mapa">
+
+            <!-- Busqueda -->
+            <div class="busqueda-mapa">
+              <span class="material-symbols-outlined">search</span>
+              <input type="text" placeholder="Ej: 6IM1">
+            </div>
+
+            <!-- Filtros (Cromo chamba)-->
+            <div class="seccion-filtros-mapa">
+              <h3>FILTROS</h3>
+              <div class="lista-filtros">
+                <label class="checkbox-filtro">
+                  <input type="checkbox" checked>
+                  <span class="check-custom"></span>
+                  <span>Aulas Académicas</span>
+                </label>
+                <label class="checkbox-filtro">
+                  <input type="checkbox" checked>
+                  <span class="check-custom"></span>
+                  <span>Laboratorios</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Estado -->
+            <div class="seccion-filtros-mapa">
+              <h3>ESTADO ACTUAL</h3>
+              <div class="lista-estados" id="lista-estados-salones">
+                <!-- JS :D -->
+                <div class="item-estado">
+                  <div class="estado-info">
+                    <span class="punto-estado disponible"></span>
+                    <span>DISPONIBLE</span>
+                  </div>
+                  <span class="conteo-estado">12</span>
+                </div>
+                <div class="item-estado">
+                  <div class="estado-info">
+                    <span class="punto-estado ocupado"></span>
+                    <span>OCUPADO</span>
+                  </div>
+                  <span class="conteo-estado">28</span>
+                </div>
+                <div class="item-estado">
+                  <div class="estado-info">
+                    <span class="punto-estado provisional"></span>
+                    <span>PROVISIONAL</span>
+                  </div>
+                  <span class="conteo-estado">4</span>
+                </div>
+                <div class="item-estado">
+                  <div class="estado-info">
+                    <span class="punto-estado mantenimiento"></span>
+                    <span>MANTENIMIENTO</span>
+                  </div>
+                  <span class="conteo-estado">2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Esto es lo de salon (orita no llama nada pq no se como) -->
+            <div class="widget-detalle-salon">
+              <div class="widget-header">
+                <div class="widget-titulo">
+                  <span class="material-symbols-outlined md-18">info</span>
+                  <span>Salon 07</span>
+                </div>
+                <button class="boton-cerrar-widget">
+                  <span class="material-symbols-outlined md-18">close</span>
+                </button>
+              </div>
+              <div class="widget-cuerpo">
+                <div class="widget-fila-principal">
+                  <div>
+                    <p class="widget-label">GRUPO</p>
+                    <p class="widget-valor-grande">6IM1</p>
+                  </div>
+                  <span class="badge-estado ocupado">OCUPADO</span>
+                </div>
+                
+                <div class="widget-info-secundaria">
+                  <div class="widget-dato">
+                    <span class="material-symbols-outlined md-18">person</span>
+                    <div>
+                      <p class="widget-label">Profesor</p>
+                      <p class="widget-valor">Trujillo Torres Jose</p>
+                    </div>
+                  </div>
+                  <div class="widget-dato">
+                    <span class="material-symbols-outlined md-18">book</span>
+                    <div>
+                      <p class="widget-label">Materia</p>
+                      <p class="widget-valor">Física IV</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="boton-widget-accion">
+                  <span class="material-symbols-outlined md-18">history</span>
+                  <span>Horario de Salón</span>
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <div class="contenedor-mapa-interactivo">
+            <div id="mapa-canvas" class="mapa-canvas-placeholder">
+              <!-- CROMO HAZME CASO Y CHAMBEA AQUI, grax <3 -->
+              <div class="mapa-controles">
+                <div class="selector-piso">
+                  <button>L</button>
+                  <button class="activo">1</button>
+                  <button>2</button>
+                  <button>3</button>
+                </div>
+              </div>
+              <div class="controles-zoom-wrapper">
+                <div class="controles-zoom">
+                  <button><span class="material-symbols-outlined md-18">add</span></button>
+                  <div class="separador-h"></div>
+                  <button><span class="material-symbols-outlined md-18">remove</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTURA GENERAL DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+
+    <script type="module" src="src/map_preG.js"></script>
+  </body>
+</html>

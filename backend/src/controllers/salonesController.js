@@ -104,7 +104,7 @@ export const listarSalones = async (req, res) => {
 // Recalcular el estado de los salones a partir de Horario_Fijo y Horario_Dinamico
 async function recalcularEstadosSalones() {
   try {
-    const diasEnum = [null, "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", null];
+    const diasEnum = [null, "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", null];
 
     const nowUTC = new Date();
     const mexicoOffset = -6 * 60;

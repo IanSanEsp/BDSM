@@ -36,6 +36,7 @@ export function tryAuth(req, _res, next) {
   next();
 }
 
+
 // Solo permitir rol admin
 export function requireAdmin(req, res, next) {
   const u = req.user;

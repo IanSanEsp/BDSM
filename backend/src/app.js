@@ -19,7 +19,7 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Configuracion del putusimo CORS
+// Configuracion del putusima  y kgada de CORS
 // CORS permitir orígenes conocidos y file:// (Origin: null) pal desarrollo local
 const allowedOrigins = new Set([
   "https://bdsm-seven.vercel.app",
@@ -69,3 +69,4 @@ app.listen(PORT, () => {
   console.log('- /api/salon-markers');
   console.log('- /api/data');
 });
+

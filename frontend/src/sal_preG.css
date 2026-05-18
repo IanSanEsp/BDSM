@@ -1,0 +1,281 @@
+/* importar estilos (namas ajusto cosas luego) */
+@import url('hor_preG.css');
+
+/* Container and table layout - rely on base variables from hor_preG.css */
+.contenedor-tabla {
+	border-radius: 12px;
+	overflow: hidden;
+	border: 1px solid var(--color-superficie-alta);
+	background-color: white;
+	box-shadow: var(--sombra-sm);
+	display: flex;
+	flex-direction: column;
+	max-height: calc(100vh - 400px);
+	min-height: 300px;
+	width: 100%;
+	max-width: calc(100vw - 320px);
+}
+.tabla-scroll {
+	overflow: auto;
+	flex: 1;
+	width: 100%;
+}
+table {
+	width: max-content;
+	min-width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	table-layout: fixed;
+}
+thead th {
+	padding: 10px 12px;
+	font-size: 10px;
+	font-weight: 700;
+	color: #6b7280;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	text-align: left;
+	border-right: 1px solid white;
+	border-bottom: 1px solid var(--color-superficie-alta);
+	background-color: var(--color-superficie-baja);
+	width: 130px;
+}
+
+/* table cells matching hor_preG */
+th { /* fallback for th outside thead */
+	padding: 10px 12px;
+	font-size: 10px;
+	font-weight: 700;
+	color: #6b7280;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	text-align: left;
+	border-right: 1px solid white;
+	border-bottom: 1px solid var(--color-superficie-alta);
+	background-color: var(--color-superficie-baja);
+}
+
+td {
+	padding: 6px;
+	border-right: 1px solid var(--color-superficie-baja);
+	border-bottom: 1px solid var(--color-superficie-baja);
+}
+
+.celda-vacia {
+	background-color: rgba(243, 243, 243, 0.2);
+	min-height: 60px;
+	padding: 8px;
+	font-size: 10px;
+	color: #9ca3af;
+	display: block;
+}
+.columna-grupo {
+	padding: 16px;
+	font-weight: 900;
+	color: #1f2937;
+	font-size: 0.875rem;
+	background-color: var(--color-superficie-baja);
+	width: 120px;
+	position: sticky;
+	left: 0;
+	z-index: 5;
+	border-right: 1px solid var(--color-superficie-alta);
+}
+
+/* Ensure horario cells match hor_preG exactly */
+.celda-horario {
+	padding: 8px;
+	border-radius: 2px;
+	border-left: 4px solid transparent;
+	height: 100%;
+	min-height: 60px;
+	box-shadow: var(--sombra-sm);
+	transition: transform 0.2s;
+	cursor: default;
+	background-color: var(--color-superficie-minima);
+}
+.celda-horario:hover { transform: scale(1.02); }
+
+/* status variants copied from hor_preG for pixel parity */
+
+.celda-exito { background-color: #f9f3f7; border-left-color: #60003E; color: #3B0024; }
+.celda-advertencia { background-color: #fffbeb; border-left-color: #f59e0b; color: #92400e; }
+.celda-error { background-color: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
+
+.materia-nombre { font-size: 10px; font-weight: 700; text-transform: uppercase; line-height: 1.2; }
+.profesor-nombre { font-size: 9px; margin-top: 2px; font-weight: 500; }
+.celda-error .profesor-nombre { font-weight: 700; text-transform: uppercase; }
+
+.info-salon { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.info-salon span { font-size: 9px; font-weight: 700; text-transform: uppercase; }
+
+/* Kebab/menu - keep minimal but match shadows and radii */
+.contenedor-menu-kebab { position: relative; }
+.menu-desplegable { position: absolute; right: 0; top: 36px; background: var(--color-superficie-minima); border-radius: 8px; box-shadow: var(--sombra-lg); display: none; min-width: 200px; }
+.menu-desplegable.activo { display: block; }
+.opcion-menu { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border: none; background: transparent; width: 100%; text-align: left; }
+
+/* Small responsive tweak to keep cells readable on narrow screens */
+@media (max-width: 720px) {
+	.columna-grupo { width: 140px; }
+	thead th { padding: 10px; font-size: 0.85rem; }
+	.materia-nombre { font-size: 9px; }
+}
+
+/* ── Rejilla inferior ── */
+.rejilla-inferior {
+	display: flex;
+	gap: 16px;
+	align-items: stretch;
+	margin-top: 16px;
+}
+
+/* Widget salones: flex para ocupar todo el espacio sobrante */
+.widget-salones-lista {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+.widget-salones-lista .widget-contenido {
+	flex: 1;
+	padding: 0;
+}
+
+/* Tabla de salones: overflow visible para que el kebab no se corte */
+.contenedor-tabla-salones {
+	border-radius: 8px;
+	border: 1px solid var(--color-superficie-alta);
+	background: var(--color-superficie-minima);
+	overflow: visible;
+}
+.tabla-dashboard {
+	width: 100%;
+	border-collapse: collapse;
+}
+.tabla-dashboard th,
+.tabla-dashboard td {
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--color-superficie-alta);
+	font-size: 0.9rem;
+}
+.tabla-dashboard thead th {
+	background: var(--color-superficie-baja);
+	color: #6b7280;
+	text-transform: uppercase;
+	font-weight: 700;
+	font-size: 0.75rem;
+}
+.tabla-dashboard tbody tr:hover { background: rgba(0,0,0,0.02); }
+.tabla-dashboard td { vertical-align: middle; }
+.fila-fijada { background: rgba(96,0,62,0.04) !important; }
+
+.estado-salon { display: inline-flex; align-items: center; gap: 8px; }
+.estado-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.estado-disponible  { background: #10b981; }
+.estado-ocupado     { background: #ef4444; }
+.estado-provisional { background: #f59e0b; }
+.estado-mantenimiento { background: #94a3b8; }
+
+/* Kebab por fila — sin overflow:hidden que lo tape */
+.acciones-celda {
+	position: relative;
+}
+.acciones-celda .contenedor-menu-kebab {
+	position: relative;
+	display: inline-block;
+}
+.acciones-celda .menu-desplegable {
+	top: 36px;
+	right: 0;
+	z-index: 30;
+	min-width: 200px;
+}
+
+/* Widget alertas: ancho fijo, flex column para que btn-ver-todas quede abajo */
+.widget-alertas-salones {
+	width: 340px;
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+}
+.widget-alertas-salones .widget-contenido {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	padding: 0 16px 16px 16px;
+}
+.widget-alertas-salones .widget-alert-list {
+	flex: 1;
+	padding: 0;
+}
+.widget-alertas-salones .btn-ver-todas {
+	margin-top: 12px;
+	margin-left: 0;
+	width: 100%;
+}
+
+@media (max-width: 960px) {
+	.rejilla-inferior { flex-direction: column; }
+	.widget-salones-lista,
+	.widget-alertas-salones { width: 100%; flex-shrink: unset; }
+}
+
+/* ── Salon ID cell (copiado de main_preG) ── */
+.salon-id-celda {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-weight: 800;
+	font-size: 1rem;
+}
+.punto-estado {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.punto-estado.disponible  { background-color: #10b981; }
+.punto-estado.ocupado     { background-color: #ef4444; }
+.punto-estado.provisional { background-color: #f59e0b; }
+.punto-estado.mantenimiento { background-color: #94a3b8; }
+.salon-id-celda.disponible   { color: #10b981; }
+.salon-id-celda.ocupado      { color: #ef4444; }
+.salon-id-celda.provisional  { color: #f59e0b; }
+.salon-id-celda.mantenimiento { color: #94a3b8; }
+
+/* ── Modal horario simple (copiado de main_preG) ── */
+.controles-modal {
+	margin-bottom: 20px;
+	display: flex;
+	justify-content: center;
+}
+.contenedor-tabla-simple {
+	background-color: white;
+	border-radius: 12px;
+	border: 1px solid var(--color-superficie-alta);
+	overflow: hidden;
+}
+.tabla-simple {
+	width: 100%;
+	border-collapse: collapse;
+}
+.tabla-simple th {
+	background-color: #f9fafb;
+	padding: 12px 16px;
+	text-align: left;
+	font-size: 11px;
+	font-weight: 700;
+	color: #4b5563;
+	text-transform: uppercase;
+	border-bottom: 1px solid var(--color-superficie-alta);
+}
+.tabla-simple td {
+	padding: 14px 16px;
+	font-size: 0.875rem;
+	color: #374151;
+	border-bottom: 1px solid #f3f4f6;
+}
+.tabla-simple tr:last-child td { border-bottom: none; }
+.tabla-simple tr:hover td { background-color: #f9fafb; }
+

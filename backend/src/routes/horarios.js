@@ -2,6 +2,7 @@ import express from "express";
 import {
 	crearHorario,
 	listarHorarios,
+	listarProfesoresCatalogo,
 	actualizarHorario,
 	eliminarHorario,
 	buscarPorBloque,
@@ -15,6 +16,7 @@ const router = express.Router();
 
 // Horarios base tabla robusta
 router.get("/", listarHorarios);
+router.get("/profesores", listarProfesoresCatalogo);
 router.post("/", requireAuth, requireAdmin, crearHorario);
 router.put("/:id", requireAuth, requireAdmin, actualizarHorario); 
 router.delete("/:id", requireAuth, requireAdmin, eliminarHorario);
