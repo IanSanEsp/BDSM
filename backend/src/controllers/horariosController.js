@@ -282,7 +282,7 @@ export const listarHorarios = async (req, res) => {
   }
 };
 
-
+//sus
 export const actualizarHorario = async (req, res) => {
   try {
     const id = Number(req.params.id);
