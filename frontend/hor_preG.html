@@ -527,9 +527,10 @@
               <input type="time" id="inc-hora">
             </div>
 
-            <div class="campo-formulario">
+            <div class="campo-formulario oculto" id="inc-contexto-container">
               <label>Contexto / Observaciones</label>
-              <textarea id="inc-contexto" rows="3"></textarea>
+              <!-- Se oculta: ahora usamos el selector como acción registrada -->
+              <textarea id="inc-contexto" rows="3" disabled></textarea>
             </div>
 
             <div class="acciones-incidencia" style="margin-top:8px;">
@@ -593,6 +594,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="src/hor_preG.js"></script>
+    <script type="module" src="src/hor_preG.js?v=2026-05-19-2"></script>
   </body>
 </html>

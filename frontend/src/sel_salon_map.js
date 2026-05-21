@@ -182,6 +182,7 @@ export async function initSalonSelectorMap({
   }
 
   async function fetchOcupadosPorRango(ctx) {
+    const fecha = String(ctx?.fecha || '').trim();
     const dia = String(ctx?.dia || '').trim();
     const hora_inicio = String(ctx?.hora_inicio || '').trim();
     const hora_fin = String(ctx?.hora_fin || '').trim();
@@ -190,6 +191,7 @@ export async function initSalonSelectorMap({
 
     try {
       const qs = new URLSearchParams({ dia, hora_inicio, hora_fin });
+      if (fecha) qs.set('fecha', fecha);
       const res = await fetch(`${apiBase}/horarios/por-bloque?${qs.toString()}`);
       const data = await res.json();
       const horarios = safeHorariosFromResponse(data);

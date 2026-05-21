@@ -1,12 +1,11 @@
 import { initSalonSelectorMap } from './sel_salon_map.js';
-import { DEFAULT_API_URL, resolveApiBase, getSessionToken } from './map_preG_shared.js';
+import { DEFAULT_API_URL, resolveApiBase, getSessionToken, paintSessionHeader } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', async () => { // namas checa el dom (algo algo w3school)
   console.log('Panel de Control BDSM CECyT 9 cargado');
 
   const apiBase = resolveApiBase() || DEFAULT_API_URL;
 
-  // Estado en memoria (antes venía de mockData)
   let grupos = [];
   let horario_fijo = [];
   let profesores = [];
@@ -17,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   // Dinámica se conecta después
   let horario_dinamico = [];
   let ausencias_profesor = [];
+  let ultimoErrorDinamica = null;
 
   const hhmm = (t) => {
     const s = String(t || '').trim();
@@ -24,6 +24,71 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     const m = s.match(/^(\d{1,2}):(\d{2})/);
     if (!m) return s;
     return `${m[1].padStart(2, '0')}:${m[2]}`;
+  };
+
+  const normalizarTipoIncidencia = (raw) => {
+    const t = String(raw || '').trim().toLowerCase();
+    if (!t) return 'ausencia_profesor';
+    if (t === 'ausencia_profesor' || t === 'junta' || t === 'excursion' || t === 'otro') return t;
+    return 'otro';
+  };
+
+  const etiquetaTipoIncidencia = (tipo) => {
+    const t = normalizarTipoIncidencia(tipo);
+    if (t === 'ausencia_profesor') return 'Ausencia - Profesor';
+    if (t === 'junta') return 'Junta Académica';
+    if (t === 'excursion') return 'Excursión';
+    return 'Otro';
+  };
+
+  const parseTipoDesdeAccion = (accion) => {
+    const s = String(accion || '').trim();
+    const m = s.match(/^\[([a-z_]+)\]\s*/i);
+    if (!m) return null;
+    return normalizarTipoIncidencia(m[1]);
+  };
+
+  const stripTipoPrefix = (accion) => String(accion || '').replace(/^\[[a-z_]+\]\s*/i, '').trim();
+
+  const fechaHoyISO = () => new Date().toISOString().split('T')[0];
+
+  const fechaYYYYMMDD = (v, fallback = '') => {
+    if (v === null || v === undefined || v === '') return fallback;
+    if (v instanceof Date && Number.isFinite(v.getTime())) return v.toISOString().slice(0, 10);
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : (s || fallback);
+  };
+
+  const diaDesdeFecha = (fechaISO) => {
+    const d = new Date(`${fechaISO}T00:00:00`);
+    const dow = d.getDay();
+    const map = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    return map[dow] || null;
+  };
+
+  const timeToMinutes = (t) => {
+    const s = String(t || '').trim();
+    if (!s) return null;
+    const m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return hh * 60 + mm;
+  };
+
+  const minutesToHHMM = (mins) => {
+    if (!Number.isFinite(mins)) return '';
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  };
+
+  const addHoursHHMM = (t, hours) => {
+    const m = timeToMinutes(t);
+    if (m === null) return '';
+    return minutesToHHMM(m + (Number(hours) * 60));
   };
 
   const normalizarDia = (raw) => {
@@ -83,11 +148,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   const cargarDatosRobusta = async () => {
     try {
-      const [gruposData, horariosData, salonesData, profesoresData] = await Promise.all([
+      const [gruposData, horariosData, salonesData, profesoresData, materiasData] = await Promise.all([
         fetchJson('/grupos'),
         fetchJson('/horarios'),
         fetchJson('/salones'),
-        fetchJson('/horarios/profesores').catch(() => ({ profesores: [] }))
+        fetchJson('/horarios/profesores').catch(() => ({ profesores: [] })),
+        fetchJson('/horarios/materias').catch(() => ({ materias: [] }))
       ]);
 
       grupos = safeRows(gruposData, 'grupos');
@@ -112,11 +178,24 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         id_profesor_aux: h.id_profesor_aux ?? h.id_auxiliar ?? null
       }));
 
-      // Derivar catálogos mínimos desde Horario_Fijo
+      // Catálogo completo de materias (solo BD)
       const materiasMap = new Map();
       const usuariosMap = new Map();
 
-      // Cargar todos los profesores aunque no tengan horarios
+      const materiasRows = safeRows(materiasData, 'materias');
+      for (const m of materiasRows) {
+        const id = Number(m?.id_materia ?? m?.id);
+        if (!Number.isFinite(id)) continue;
+        if (!materiasMap.has(id)) {
+          materiasMap.set(id, {
+            id_materia: id,
+            nombre_materia: m?.nombre_materia || m?.materia || `Materia ${id}`,
+            area_estudio: m?.area_estudio || null
+          });
+        }
+      }
+
+      // Cargar todos los profes
       const profesoresRows = safeRows(profesoresData, 'profesores');
       for (const p of profesoresRows) {
         const id = Number(p?.id_profesor ?? p?.id_usuarios ?? p?.id);
@@ -131,16 +210,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       }
 
       for (const h of horario_fijo) {
-        if (h.id_materia && (h.nombre_materia || h.materia)) {
-          if (!materiasMap.has(h.id_materia)) {
-            materiasMap.set(h.id_materia, {
-              id_materia: h.id_materia,
-              nombre_materia: h.nombre_materia || h.materia,
-              area_estudio: h.area_estudio
-            });
-          }
-        }
-
         if (h.id_profesor && h.nombre_profesor) {
           if (!usuariosMap.has(h.id_profesor)) {
             usuariosMap.set(h.id_profesor, {
@@ -175,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       materias = [...materiasMap.values()].sort((a, b) => String(a.nombre_materia).localeCompare(String(b.nombre_materia)));
       usuarios = [...usuariosMap.values()].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
 
-      // Lista de profesores para los widgets robustos
+      // Lista de profes
       const profSet = new Set();
       profesores = [];
       for (const u of usuarios) {
@@ -186,12 +255,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         profesores.push({ id_profesor: id, estado_asistencia: 'Presente' });
       }
 
-      // Dinámica se deja vacía por ahora
+      // Dinámica vacía porq q miedo chambear esto 
       horario_dinamico = [];
       ausencias_profesor = [];
     } catch (e) {
       console.error('Error cargando datos robustos:', e);
-      // Dejar arrays vacíos para que la UI no truene
+      // Dejar arrays vacíos para que la UI no se vaya al coño (tambien la bd)
       grupos = [];
       horario_fijo = [];
       profesores = [];
@@ -201,6 +270,53 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       horario_dinamico = [];
       ausencias_profesor = [];
       alert('No se pudieron cargar los horarios desde el servidor.');
+    }
+  };
+
+  let fechaDinamica = fechaHoyISO();
+
+  const cargarDatosDinamica = async (fechaISO = fechaDinamica) => {
+    fechaDinamica = fechaISO || fechaHoyISO();
+    try {
+      ultimoErrorDinamica = null;
+      const [ausenciasData, tablaData] = await Promise.all([
+        fetchJson(`/ausencias?fecha=${encodeURIComponent(fechaDinamica)}`, { auth: true }),
+        fetchJson(`/horarios/tabla-dinamica?fecha=${encodeURIComponent(fechaDinamica)}`, { auth: true })
+      ]);
+
+      const ausRows = safeRows(ausenciasData, 'ausencias');
+      ausencias_profesor = ausRows.map((a) => ({
+        ...a,
+        // Forzar a la fecha solicitada para evitar desfaces (DATE -> ISO con TZ)
+        fecha: fechaDinamica,
+        hora: hhmm(a.hora),
+        tipo_incidencia: normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo ?? parseTipoDesdeAccion(a.accion_tomada) ?? 'ausencia_profesor'),
+        accion_tomada: stripTipoPrefix(a.accion_tomada),
+        id_profesor: Number(a.id_profesor),
+        id_grupo: a.id_grupo != null ? Number(a.id_grupo) : null
+      }));
+
+      const tablaRows = safeRows(tablaData, 'tabla');
+      horario_dinamico = tablaRows
+        .filter((r) => r && r.id_horario_dinamico != null)
+        .map((r) => ({
+          ...r,
+          id_horario_dinamico: Number(r.id_horario_dinamico),
+          // Forzar a la fecha solicitada para evitar desfaces (DATE -> ISO con TZ)
+          fecha: fechaDinamica,
+          dia: normalizarDia(r.dia || diaDesdeFecha(fechaDinamica) || ''),
+          hora_inicio: hhmm(r.hora_inicio_temp ?? r.hora_inicio),
+          hora_fin: hhmm(r.hora_fin_temp ?? r.hora_fin),
+          id_horario_fijo_detalle: r.id_horario_fijo_detalle != null ? Number(r.id_horario_fijo_detalle) : null,
+          id_horario_fijo: r.id_horario_fijo != null ? Number(r.id_horario_fijo) : null,
+          id_grupo: r.id_grupo != null ? Number(r.id_grupo) : null,
+          id_profesor: r.id_profesor != null ? Number(r.id_profesor) : null,
+          id_materia: r.id_materia != null ? Number(r.id_materia) : null
+        }));
+    } catch (err) {
+      console.error('Error cargando dinámica:', err);
+      ultimoErrorDinamica = err;
+      // Mantener el último estado conocido (incluye UI optimista) para no “borrar” incidencias/colores
     }
   };
   
@@ -240,7 +356,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   const diaLaboralHoy = () => {
     const d = new Date();
     const dow = d.getDay();
-    // 0=Domingo,6=Sábado -> mostrar viernes (consistente con backend/otros módulos)
     const map = [
       'Viernes',
       'Lunes',
@@ -256,13 +371,19 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   let diaSeleccionadoTabla = diaLaboralHoy();
 
   let semestreSeleccionado = 6;
-  let modoVista = 'robusta'; // SOLO robusta por ahora (la dinámica se conecta después)
+  let modoVista = 'dinamica'; // UI arranca en dinámica (ver hor_preG.html)
   let gruposFijados = [];
   let profesoresFijados = [];
+
+  let salonModoSeleccion = 'registro';
+  let adelantosPropuestos = [];
+  let adelantoPendiente = null;
+  let salonSeleccionadoAdelanto = null;
 
   const determinarSemestresDisponibles = () => {
     const ahora = new Date();
     const mes = ahora.getMonth();
+    // QUIEN FUE EL HDP Q SE AVENTO ESTA CHAKETONA -wenazo
     // Enero (0) a Junio (5) -> Pares (2, 4, 6)
     // Julio (6) a Diciembre (11) -> Impares (1, 3, 5)
     return (mes >= 0 && mes <= 5) ? [2, 4, 6] : [1, 3, 5];
@@ -302,6 +423,21 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
     const gruposFiltrados = grupos.filter(g => Number(g.semestre) === Number(semestreSeleccionado));
 
+    const ausenteTitularEnHora = (h) => {
+      if (modoVista !== 'dinamica') return false;
+      const pid = Number(h?.id_profesor);
+      const gid = Number(h?.id_grupo);
+      const horaIni = hhmm(h?.hora_inicio);
+      if (!Number.isFinite(pid) || !Number.isFinite(gid) || !horaIni) return false;
+      return ausencias_profesor.some((a) =>
+        (a.fecha || fechaDinamica) === fechaDinamica &&
+        normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
+        Number(a.id_profesor) === pid &&
+        Number(a.id_grupo) === gid &&
+        hhmm(a.hora) === horaIni
+      );
+    };
+
     gruposFiltrados.forEach(grupo => {
       const fila = document.createElement('tr');
       
@@ -326,26 +462,51 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
         if (modoVista === 'dinamica') {
           // Premier buscar en dinamico
-          infoDinamica = horario_dinamico.find(d => {
-            const hf = horario_fijo.find(f => f.id_horario_fijo === d.id_horario_fijo);
-            return hf && hf.id_grupo === grupo.id_grupo && hf.dia === diaSeleccionadoTabla && d.hora_inicio === hora;
-          });
+          infoDinamica = horario_dinamico.find(
+            (d) =>
+              Number(d.id_grupo) === Number(grupo.id_grupo) &&
+              normalizarDia(d.dia) === diaSeleccionadoTabla &&
+              hhmm(d.hora_inicio) === hhmm(hora)
+          );
 
           if (infoDinamica) {
-            const hf = horario_fijo.find(f => f.id_horario_fijo === infoDinamica.id_horario_fijo);
-            horario = { ...hf, ...infoDinamica, id_salon: infoDinamica.id_salon_temporal };
+            const hf = horario_fijo.find(
+              (f) => Number(f.id_horario_fijo_detalle) === Number(infoDinamica.id_horario_fijo_detalle)
+            );
+            horario = {
+              ...hf,
+              ...infoDinamica,
+              id_salon: infoDinamica.id_salon_temporal || hf?.id_salon
+            };
             esDinamico = true;
           } else {
             // Si no hay dinamico, buscar fijo
             horario = horario_fijo.find(h => h.id_grupo === grupo.id_grupo && h.dia === diaSeleccionadoTabla && h.hora_inicio === hora);
             
+            // Si la clase fija existe pero tiene adelantos parciales, ajustar su hora_fin
             if (horario) {
-              const tieneReemplazo = horario_dinamico.some(d => d.id_horario_fijo === horario.id_horario_fijo);
-              if (tieneReemplazo) horario = null;
+              const dinamicosCubrentes = horario_dinamico.filter(
+                (d) => Number(d.id_horario_fijo_detalle) === Number(horario.id_horario_fijo_detalle)
+              );
+              if (dinamicosCubrentes.length > 0) {
+                const durOriginal = timeToMinutes(horario.hora_fin) - timeToMinutes(horario.hora_inicio);
+                const periodosOriginal = Math.max(1, Math.ceil(durOriginal / 60));
+                const minsAvanzados = dinamicosCubrentes.reduce((total, d) => {
+                  return total + (timeToMinutes(d.hora_fin) - timeToMinutes(d.hora_inicio));
+                }, 0);
+                const periodosAvanzados = Math.ceil(minsAvanzados / 60);
+                if (periodosAvanzados >= periodosOriginal) {
+                  horario = null;
+                } else {
+                  const periodosRestantes = periodosOriginal - periodosAvanzados;
+                  const newEnd = timeToMinutes(horario.hora_inicio) + periodosRestantes * 50;
+                  horario = { ...horario, hora_fin: minutesToHHMM(newEnd) };
+                }
+              }
             }
           }
         } else {
-          // Robusta: mostrar SOLO el día seleccionado (hoy laboral)
+          // en robusta mostrar solo el día seleccionado (el hoy y solo laboral porq nose como va la vaina los sabados)
           horario = horario_fijo.find(h =>
             h.id_grupo === grupo.id_grupo &&
             h.dia === diaSeleccionadoTabla &&
@@ -357,7 +518,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           const materia = materias.find(m => m.id_materia === horario.id_materia);
           const profesorUsuario = usuarios.find(u => u.id_usuarios === horario.id_profesor);
           const salon = salones.find(s => s.id_salon === horario.id_salon);
-          const profesorInfo = profesores.find(p => p.id_profesor === horario.id_profesor);
+          const esAusenteTitular = ausenteTitularEnHora(horario);
 
           const indexInicio = franjasHorarias.indexOf(horario.hora_inicio);
           const indexFin = franjasHorarias.indexOf(horario.hora_fin.split(':')[0] + ':00');
@@ -375,8 +536,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           let claseColor = 'celda-exito';
 
           if (modoVista === 'dinamica') {
-            const esAusente = profesorInfo?.estado_asistencia === 'Ausente';
-            if (esAusente) claseColor = 'celda-error';
+            if (esAusenteTitular) claseColor = 'celda-error';
             else if (esDinamico) claseColor = 'celda-advertencia';
           }
           
@@ -385,7 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           
           divCelda.innerHTML = `
             <p class="materia-nombre">${materia?.nombre_materia || 'Materia'}</p>
-            <p class="profesor-nombre">${(modoVista === 'dinamica' && profesorInfo?.estado_asistencia === 'Ausente') ? 'INSASISTENCIA' : (profesorUsuario?.nombre || 'Profesor')}</p>
+            <p class="profesor-nombre">${(modoVista === 'dinamica' && esAusenteTitular) ? 'INSASISTENCIA' : (profesorUsuario?.nombre || 'Profesor')}</p>
             <div class="info-salon">
               <span class="material-symbols-outlined md-18">location_on</span>
               <span>${salon?.numero_salon || horario?.numero_salon || horario?.nombre_salon || 'S/N'}</span>
@@ -481,7 +641,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       return 0;
     });
 
-    profesoresOrdenados.forEach(p => { // muestra todos los profesores (derivados del horario fijo)
+    profesoresOrdenados.forEach(p => { // muestra todos los profesores (vienen del horario fijo)
       const usuario = usuarios.find(u => u.id_usuarios === p.id_profesor);
       const item = document.createElement('div');
       item.className = 'item-lista-robusta';
@@ -523,7 +683,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     
     contenedor.innerHTML = '';
 
-    // Alertas = datos faltantes en Horario_Fijo (profesor/salón/materia/grupo)
+    // Alertas de datos faltantes en Horario_Fijo (profesor/salón/materia/grupo o cosas de ese estilo)
     const grupoPorId = new Map(grupos.map(g => [Number(g.id_grupo), g]));
     const materiaPorId = new Map(materias.map(m => [Number(m.id_materia), m]));
     const usuarioPorId = new Map(usuarios.map(u => [Number(u.id_usuarios), u]));
@@ -543,7 +703,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       if (!p || !p.nombre) faltantes.push({ tipo: 'Profesor', detalle: contexto, periodo: '—' });
       if (!s || !s.numero_salon) faltantes.push({ tipo: 'Salón', detalle: contexto, periodo: '—' });
 
-      // Auxiliar es opcional, pero si viene id y no se resuelve, se reporta
+      // Auxiliar es opcional (gracias copilot por acordarme)
       if (h.id_auxiliar && !usuarioPorId.get(Number(h.id_auxiliar))) {
         faltantes.push({ tipo: 'Prof. Aux.', detalle: contexto, periodo: '—' });
       }
@@ -582,9 +742,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   };
 
   // Switch dinamico/robusto (pero no usa un switch, usa botones c:)
+  // yo creo q void a empezar a contar todos los ifs 👀👀👀👀
   const selectorModo = document.getElementById('selector-modo-vista');
   if (selectorModo) {
-    selectorModo.addEventListener('click', (e) => {
+    selectorModo.addEventListener('click', async (e) => {
       const boton = e.target.closest('button');
       if (boton) {
         modoVista = boton.getAttribute('data-modo');
@@ -607,6 +768,14 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           widgetsDinamicos.classList.remove('oculto');
           widgetsRobustos.classList.add('oculto');
           botonNuevo.classList.add('oculto');
+
+          await cargarDatosDinamica(fechaHoyISO());
+          const dia = diaDesdeFecha(fechaDinamica);
+          if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+            diaSeleccionadoTabla = dia;
+          }
+          renderizarAdelantos();
+          renderizarAlertas();
         }
 
         renderizarTabla();
@@ -616,6 +785,43 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   await cargarDatosRobusta();
   actualizarBotonesSemestre();
+
+  // Aplicar el modo inicial real (evita mismatch: HTML marca Dinamica activo pero JS estaba en robusta)
+  (async function aplicarModoInicial() {
+    const selectorModoInit = document.getElementById('selector-modo-vista');
+    if (selectorModoInit) {
+      selectorModoInit.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('activo', b.getAttribute('data-modo') === modoVista);
+      });
+    }
+
+    const widgetsDinamicos = document.getElementById('widgets-dinamicos');
+    const widgetsRobustos = document.getElementById('widgets-robustos');
+    const botonNuevo = document.getElementById('boton-nuevo-registro');
+
+    if (modoVista === 'robusta') {
+      if (widgetsDinamicos) widgetsDinamicos.classList.add('oculto');
+      if (widgetsRobustos) widgetsRobustos.classList.remove('oculto');
+      if (botonNuevo) botonNuevo.classList.remove('oculto');
+      renderizarListadoGrupos();
+      renderizarListadoProfesores();
+      renderizarAlertasFaltantes();
+    } else {
+      if (widgetsDinamicos) widgetsDinamicos.classList.remove('oculto');
+      if (widgetsRobustos) widgetsRobustos.classList.add('oculto');
+      if (botonNuevo) botonNuevo.classList.add('oculto');
+
+      await cargarDatosDinamica(fechaHoyISO());
+      const dia = diaDesdeFecha(fechaDinamica);
+      if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+        diaSeleccionadoTabla = dia;
+      }
+      renderizarAdelantos();
+      renderizarAlertas();
+    }
+
+    renderizarTabla();
+  })();
 
   // Dolor de cabeza para visibilidad (boton de registro)
   (function asegurarVisibilidadBotonNuevo() { // NI PERRA IDEA COMO HACERLO MAS LIMPIO, PERO FUNCIONA
@@ -635,17 +841,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   })();
 
   // Render inicial de widgets robustos
-  if (modoVista === 'robusta') {
-    const selectorModoInit = document.getElementById('selector-modo-vista');
-    if (selectorModoInit) {
-      selectorModoInit.querySelectorAll('button').forEach((b) => {
-        b.classList.toggle('activo', b.getAttribute('data-modo') === 'robusta');
-      });
-    }
-    renderizarListadoGrupos();
-    renderizarListadoProfesores();
-    renderizarAlertasFaltantes();
-  }
+  // (el modo inicial ahora lo aplica aplicarModoInicial)
 
   const contenedorSemestres = document.getElementById('selector-semestres');
   if (contenedorSemestres) {
@@ -671,26 +867,330 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
     contenedor.innerHTML = '';
 
-    horario_dinamico.forEach(adelanto => {
-      const hf = horario_fijo.find(h => h.id_horario_fijo === adelanto.id_horario_fijo);
-      const grupo = grupos.find(g => g.id_grupo === hf?.id_grupo);
-      const materia = materias.find(m => m.id_materia === hf?.id_materia);
+    if (modoVista !== 'dinamica') return;
 
-      const div = document.createElement('div');
-      div.className = 'tarjeta-adelanto';
-      div.innerHTML = `
+    const dia = diaDesdeFecha(fechaDinamica);
+    if (!dia || !['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+      const empty = document.createElement('div');
+      empty.className = 'tarjeta-adelanto';
+      empty.innerHTML = `
         <div class="adelanto-info">
-          <div class="etiqueta-grupo">${grupo?.nombre_grupo || 'G'}</div>
           <div class="adelanto-texto">
-            <p>${materia?.nombre_materia || 'Materia'}</p>
-            <p>${hf?.hora_inicio} - ${hf?.hora_fin}</p>
+            <p>Sin adelantos</p>
+            <p>Selecciona un día hábil.</p>
           </div>
         </div>
-        <span class="material-symbols-outlined md-24">trending_flat</span>
-        <p class="adelanto-hora">${adelanto.hora_inicio} - ${adelanto.hora_fin}</p>
       `;
-      contenedor.appendChild(div);
+      contenedor.appendChild(empty);
+      return;
+    }
+
+    const agruparSesiones = (slotsOrdenados) => {
+      const sesiones = [];
+      let actual = null;
+      for (const slot of slotsOrdenados) {
+        const hi = timeToMinutes(slot.hora_inicio);
+        if (!actual) {
+          actual = {
+            slots: [slot],
+            id_profesor: slot.id_profesor,
+            id_profesor_aux: slot.id_profesor_aux ?? slot.id_auxiliar ?? null,
+            id_materia: slot.id_materia,
+            id_grupo: slot.id_grupo
+          };
+          continue;
+        }
+        const prev = actual.slots[actual.slots.length - 1];
+        const prevHi = timeToMinutes(prev.hora_inicio);
+        const esConsecutivo = hi !== null && prevHi !== null && hi === prevHi + 60;
+        const mismoBloque =
+          Number(slot.id_profesor) === Number(actual.id_profesor) &&
+          Number(slot.id_profesor_aux ?? slot.id_auxiliar ?? null) === Number(actual.id_profesor_aux ?? null) &&
+          Number(slot.id_materia) === Number(actual.id_materia) &&
+          Number(slot.id_grupo) === Number(actual.id_grupo);
+
+        if (esConsecutivo && mismoBloque) {
+          actual.slots.push(slot);
+        } else {
+          sesiones.push(actual);
+          actual = {
+            slots: [slot],
+            id_profesor: slot.id_profesor,
+            id_profesor_aux: slot.id_profesor_aux ?? slot.id_auxiliar ?? null,
+            id_materia: slot.id_materia,
+            id_grupo: slot.id_grupo
+          };
+        }
+      }
+      if (actual) sesiones.push(actual);
+      return sesiones;
+    };
+
+    const staffIds = (h) => {
+      const ids = [h?.id_profesor, h?.id_profesor_aux ?? h?.id_auxiliar ?? null]
+        .map((x) => (x === null || x === undefined || x === '' ? null : Number(x)))
+        .filter((x) => Number.isFinite(x));
+      return [...new Set(ids)];
+    };
+
+    const ocupaEnMinuto = (h, tMin) => {
+      const hi = timeToMinutes(h?.hora_inicio);
+      const hfRaw = timeToMinutes(h?.hora_fin);
+      if (hi === null || hfRaw === null) return false;
+      // Si está en la hora exacta (09:00), interpretarlo como 08:50 (regla -10 min)
+      const hf = hfRaw % 60 === 0 && hfRaw > hi ? hfRaw - 10 : hfRaw;
+      return tMin >= hi && tMin < hf;
+    };
+
+    const staffLibreEn = (ids, horaInicioHHMM) => {
+      const tMin = timeToMinutes(horaInicioHHMM);
+      if (!ids || ids.length === 0 || tMin === null) return false;
+      return !horario_fijo.some((h) => {
+        if (h.dia !== dia) return false;
+        if (!ocupaEnMinuto(h, tMin)) return false;
+        const hStaff = staffIds(h);
+        return hStaff.some((pid) => ids.includes(pid));
+      });
+    };
+
+    const staffLibreEnExcluyendo = (ids, horaInicioHHMM, excludeSlotIds = [], groupId = null) => {
+      const tMin = timeToMinutes(horaInicioHHMM);
+      if (!ids || ids.length === 0 || tMin === null) return false;
+      const excludeSet = new Set(excludeSlotIds.map(id => Number(id)));
+      return !horario_fijo.some((h) => {
+        if (h.dia !== dia) return false;
+        if (excludeSet.has(Number(h.id_horario_fijo_detalle))) return false;
+        if (!ocupaEnMinuto(h, tMin)) return false;
+        const hStaff = staffIds(h);
+        if (!hStaff.some((pid) => ids.includes(pid))) return false;
+        // Verificar si el profesor tiene ausencia registrada en esta hora exacta
+        if (groupId && ids.some((pid) => ausenciasExpandidas.get(groupId)?.get(tMin)?.has(pid))) return false;
+        return true;
+      });
+    };
+
+    const claseGrupoEnHora = (idGrupo, horaInicioHHMM) =>
+      horario_fijo.find(
+        (h) =>
+          h.dia === dia &&
+          Number(h.id_grupo) === Number(idGrupo) &&
+          hhmm(h.hora_inicio) === hhmm(horaInicioHHMM)
+      );
+
+    const ausenciasDia = ausencias_profesor
+      .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
+      .filter((a) => normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor');
+    // group -> timeMin -> Set(id_profesor) — ausencias originales
+    const ausenciasPorGrupoTiempo = new Map();
+    // group -> timeMin -> Set(id_profesor) — expandidas a todas las horas de la clase afectada
+    const ausenciasExpandidas = new Map();
+    for (const a of ausenciasDia) {
+      const gid = Number(a.id_grupo);
+      const mins = timeToMinutes(a.hora);
+      const pid = Number(a.id_profesor);
+      if (!Number.isFinite(gid) || mins === null || !Number.isFinite(pid)) continue;
+
+      // Original
+      if (!ausenciasPorGrupoTiempo.has(gid)) ausenciasPorGrupoTiempo.set(gid, new Map());
+      const mapOri = ausenciasPorGrupoTiempo.get(gid);
+      if (!mapOri.has(mins)) mapOri.set(mins, new Set());
+      mapOri.get(mins).add(pid);
+
+      // Expandir a todas las horas que cubre la clase afectada por la ausencia
+      const slotBase = horario_fijo.find(h =>
+        h.dia === dia &&
+        Number(h.id_grupo) === gid &&
+        Number(h.id_profesor) === pid &&
+        timeToMinutes(h.hora_inicio) === mins
+      );
+      if (!slotBase) continue;
+      const hi = timeToMinutes(slotBase.hora_inicio);
+      const hfRaw = timeToMinutes(slotBase.hora_fin);
+      if (hi === null || hfRaw === null) continue;
+      const hf = hfRaw % 60 === 0 && hfRaw > hi ? hfRaw - 10 : hfRaw;
+      for (let t = hi; t < hf; t += 60) {
+        if (!ausenciasExpandidas.has(gid)) ausenciasExpandidas.set(gid, new Map());
+        const map = ausenciasExpandidas.get(gid);
+        if (!map.has(t)) map.set(t, new Set());
+        map.get(t).add(pid);
+      }
+    }
+
+    const horaLibrePorIncidencia = (idGrupo, startMins) => {
+      const clase = claseGrupoEnHora(idGrupo, minutesToHHMM(startMins));
+      if (!clase) return false;
+      const req = staffIds(clase);
+      if (req.length === 0) return false;
+      const absentSet = ausenciasPorGrupoTiempo.get(Number(idGrupo))?.get(startMins);
+      if (!absentSet) return false;
+      // Regla: si hay auxiliar asignado, debe estar ausente también.
+      return req.every((pid) => absentSet.has(pid));
+    };
+
+    const propuestas = [];
+    const visto = new Set();
+
+    for (const [idGrupo, timeMap] of ausenciasPorGrupoTiempo.entries()) {
+      const slotsGrupo = horario_fijo
+        .filter((h) => h.dia === dia && Number(h.id_grupo) === Number(idGrupo))
+        .slice()
+        .sort((a, b) => (timeToMinutes(a.hora_inicio) ?? 0) - (timeToMinutes(b.hora_inicio) ?? 0));
+
+      if (slotsGrupo.length === 0) continue;
+
+      const sesiones = agruparSesiones(slotsGrupo);
+      const ultimaSesion = sesiones[sesiones.length - 1];
+      if (!ultimaSesion || ultimaSesion.slots.length === 0) continue;
+
+      const slotFinal = ultimaSesion.slots[ultimaSesion.slots.length - 1];
+      const primerSlot = ultimaSesion.slots[0];
+      const origenStartMins = timeToMinutes(slotFinal.hora_inicio);
+      if (origenStartMins === null) continue;
+      const sesionStartMins = timeToMinutes(primerSlot.hora_inicio);
+      if (sesionStartMins === null) continue;
+
+      const durSlot = (() => {
+        const hi = timeToMinutes(slotFinal.hora_inicio);
+        const hf = timeToMinutes(slotFinal.hora_fin);
+        if (hi === null || hf === null) return 50;
+        return Math.max(1, hf - hi);
+      })();
+
+      const horasSesion = Math.ceil(durSlot / 60);
+      const titularIdSesion = Number(ultimaSesion.id_profesor);
+      if (!Number.isFinite(titularIdSesion)) continue;
+
+      const ausenciaStarts = [...timeMap.keys()].sort((a, b) => a - b);
+      for (const ausenciaStartMins of ausenciaStarts) {
+        if (ausenciaStartMins >= sesionStartMins) continue;
+
+        if (!horaLibrePorIncidencia(idGrupo, ausenciaStartMins)) continue;
+
+        // Calcular cuántas horas cubre la clase que tuvo la ausencia
+        const claseAusencia = claseGrupoEnHora(idGrupo, minutesToHHMM(ausenciaStartMins));
+        const durAusencia = claseAusencia
+          ? (timeToMinutes(claseAusencia.hora_fin) ?? 0) - (timeToMinutes(claseAusencia.hora_inicio) ?? 0)
+          : 50;
+        const horasAusencia = Math.ceil(Math.max(1, durAusencia) / 60);
+        const maxIteraciones = Math.min(horasSesion, horasAusencia);
+
+        const excludeSlotIds = ultimaSesion.slots.map(s => Number(s.id_horario_fijo_detalle));
+        let maxConsec = 0;
+        for (let i = 0; i < maxIteraciones; i++) {
+          const t = ausenciaStartMins + i * 60;
+          if (i === 0) {
+            if (!horaLibrePorIncidencia(idGrupo, t)) break;
+          }
+          if (!staffLibreEnExcluyendo([titularIdSesion], minutesToHHMM(t), excludeSlotIds, Number(idGrupo))) break;
+          maxConsec++;
+        }
+        if (maxConsec <= 0) continue;
+
+        const grupo = grupos.find((g) => Number(g.id_grupo) === Number(idGrupo));
+        const materia = materias.find((m) => Number(m.id_materia) === Number(slotFinal.id_materia));
+
+        const maxParcial = Math.min(maxConsec, horasSesion);
+        if (maxParcial > 0) {
+          const slotsOrigen = ultimaSesion.slots.slice(Math.max(0, ultimaSesion.slots.length - maxParcial));
+          const key = `${slotsOrigen.map((s) => s.id_horario_fijo_detalle).join('-')}-${ausenciaStartMins}`;
+          if (!visto.has(key)) {
+            visto.add(key);
+
+            propuestas.push({
+              id_grupo: idGrupo,
+              dia,
+              fecha: fechaDinamica,
+              id_profesor: titularIdSesion,
+              id_materia: Number(slotFinal.id_materia),
+              grupo_nombre: grupo?.nombre_grupo || String(idGrupo),
+              materia_nombre: materia?.nombre_materia || 'Materia',
+              slots_origen: slotsOrigen,
+              destino_start_mins: ausenciaStartMins,
+              bloques_a_mover: maxConsec,
+              dur_mins: 50,
+              motivo: 'Adelanto por incidencia'
+            });
+          }
+        }
+      }
+    }
+
+    // Filtrar propuestas: excluir aquellas cuyos bloques ya fueron completamente adelantados
+    const propuestasNoAdelantadas = propuestas.filter((prop) => {
+      // Una propuesta está "adelantada" si TODOS sus slots_origen tienen adelantos en horario_dinamico
+      const slotIds = new Set((prop.slots_origen || []).map((s) => Number(s.id_horario_fijo_detalle)));
+      if (slotIds.size === 0) return true; // Sin info de origen, mantener
+
+      const adelantosParaEstaClase = horario_dinamico.filter((d) =>
+        Number(d.id_horario_fijo_detalle) && slotIds.has(Number(d.id_horario_fijo_detalle))
+      );
+
+      // Todos los slots deben tener al menos un adelanto
+      const slotsConAdelanto = new Set(adelantosParaEstaClase.map((d) => Number(d.id_horario_fijo_detalle)));
+      const todosAdelantados = Array.from(slotIds).every((id) => slotsConAdelanto.has(id));
+
+      // Mantener solo si NO está completamente adelantada
+      return !todosAdelantados;
     });
+
+    adelantosPropuestos = propuestasNoAdelantadas;
+
+    if (adelantosPropuestos.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tarjeta-adelanto';
+      empty.innerHTML = `
+        <div class="adelanto-info">
+          <div class="adelanto-texto">
+            <p>Sin adelantos</p>
+            <p>No hay incidencias con condiciones para adelantar.</p>
+          </div>
+        </div>
+      `;
+      contenedor.appendChild(empty);
+      return;
+    }
+
+    const adelantosOrdenados = adelantosPropuestos
+      .map((p, originalIdx) => ({ p, originalIdx }))
+      .sort((a, b) => {
+        const da = a.p?.destino_start_mins ?? 0;
+        const db = b.p?.destino_start_mins ?? 0;
+        if (da !== db) return da - db;
+        const la = Array.isArray(a.p?.slots_origen) ? a.p.slots_origen.length : 1;
+        const lb = Array.isArray(b.p?.slots_origen) ? b.p.slots_origen.length : 1;
+        // Mostrar primero las propuestas más cortas (1 hora antes que 2, etc.)
+        return la - lb;
+      });
+
+    adelantosOrdenados.forEach(({ p, originalIdx }) => {
+        const slots = Array.isArray(p.slots_origen) ? p.slots_origen : [];
+        const slotOrigIni = slots[0] || null;
+        const slotOrigFin = slots[slots.length - 1] || null;
+
+        const origenText = slotOrigIni && slotOrigFin
+          ? `${hhmm(slotOrigIni.hora_inicio)} - ${hhmm(slotOrigFin.hora_fin)}`
+          : '-';
+
+        const destinoInicio = minutesToHHMM(p.destino_start_mins);
+        const destinoFin = minutesToHHMM(p.destino_start_mins + (Math.max(1, p.bloques_a_mover) - 1) * 60 + p.dur_mins);
+
+        const div = document.createElement('div');
+        div.className = 'tarjeta-adelanto';
+        // IMPORTANT: usar el índice real del arreglo (no el índice del sort)
+        div.dataset.idx = String(originalIdx);
+        div.innerHTML = `
+          <div class="adelanto-info">
+            <div class="etiqueta-grupo">${p.grupo_nombre}</div>
+            <div class="adelanto-texto">
+              <p>${p.materia_nombre} · ${p.bloques_a_mover || slots.length} bloque(s)</p>
+              <p>${origenText}</p>
+            </div>
+          </div>
+          <span class="material-symbols-outlined md-24">trending_flat</span>
+          <p class="adelanto-hora">${destinoInicio} - ${destinoFin}</p>
+        `;
+        contenedor.appendChild(div);
+      });
   };
 
   // Abrir modal confirmar adelanto al hacer click en una tarjeta de adelanto
@@ -704,13 +1204,32 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     modalConfirmarAdelanto.classList.add('activo');
   };
 
+  const iniciarFlujoAdelanto = (propuesta) => {
+    adelantoPendiente = propuesta;
+    salonSeleccionadoAdelanto = null;
+    salonModoSeleccion = 'adelanto';
+
+    const destinoInicio = minutesToHHMM(propuesta.destino_start_mins);
+    const bloques = propuesta.bloques_a_mover || 1;
+    const destinoFin = minutesToHHMM(propuesta.destino_start_mins + (Math.max(1, bloques) - 1) * 60 + propuesta.dur_mins);
+    abrirModalSalonConContexto({
+      fecha: fechaDinamica,
+      dia: propuesta.dia,
+      hora_inicio: destinoInicio,
+      hora_fin: destinoFin
+    });
+  };
+
   // redirect
   const contenedorAdelantos = document.getElementById('contenedor-adelantos');
   if (contenedorAdelantos) {
     contenedorAdelantos.addEventListener('click', (e) => {
       const tarjeta = e.target.closest('.tarjeta-adelanto');
       if (tarjeta) {
-        abrirConfirmarAdelanto(tarjeta);
+        const idx = Number(tarjeta.dataset.idx);
+        const propuesta = adelantosPropuestos[idx];
+        if (!propuesta) return;
+        iniciarFlujoAdelanto(propuesta);
       }
     });
   }
@@ -726,9 +1245,67 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     });
   }
   if (btnConfirmarAdelanto) {
-    btnConfirmarAdelanto.addEventListener('click', () => {
-      // Sin funcionalidad solo cerrar modal
-      if (modalConfirmarAdelanto) modalConfirmarAdelanto.classList.remove('activo');
+    btnConfirmarAdelanto.addEventListener('click', async () => {
+      if (!adelantoPendiente) {
+        alert('No hay adelanto seleccionado.');
+        return;
+      }
+      if (!salonSeleccionadoAdelanto?.id_salon) {
+        alert('Selecciona un salón para el adelanto.');
+        return;
+      }
+
+      const idSalon = Number(salonSeleccionadoAdelanto.id_salon);
+      const fecha = adelantoPendiente.fecha || fechaDinamica;
+      const destinoStart = adelantoPendiente.destino_start_mins;
+      const dur = Number(adelantoPendiente.dur_mins);
+
+      btnConfirmarAdelanto.disabled = true;
+      try {
+        // Agrupar bloques consecutivos por slot para evitar llamadas duplicadas
+        const slotGroups = [];
+        let currentGroup = null;
+        for (let i = 0; i < adelantoPendiente.bloques_a_mover; i++) {
+          const slot = adelantoPendiente.slots_origen[Math.min(i, adelantoPendiente.slots_origen.length - 1)];
+          const idDetalle = Number(slot.id_horario_fijo_detalle);
+          if (!idDetalle) continue;
+          if (!currentGroup || currentGroup.idDetalle !== idDetalle) {
+            currentGroup = { idDetalle, slot, startIdx: i, count: 1 };
+            slotGroups.push(currentGroup);
+          } else {
+            currentGroup.count++;
+          }
+        }
+
+        for (const group of slotGroups) {
+          const hi = minutesToHHMM(destinoStart + group.startIdx * 60);
+          const durTotal = (group.count - 1) * 60 + dur;
+          const hf = minutesToHHMM(destinoStart + group.startIdx * 60 + durTotal);
+
+          await fetchJson(`/horarios/${group.idDetalle}/adelantar-clase`, {
+            method: 'POST',
+            auth: true,
+            body: {
+              fecha,
+              hora_inicio: hi,
+              hora_fin: hf,
+              id_salon_temporal: idSalon,
+              motivo: adelantoPendiente.motivo || 'Adelanto de clase'
+            }
+          });
+        }
+
+        if (modalConfirmarAdelanto) modalConfirmarAdelanto.classList.remove('activo');
+        await cargarDatosDinamica(fecha);
+        renderizarTabla();
+        renderizarAdelantos();
+        renderizarAlertas();
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || 'Error registrando adelanto');
+      } finally {
+        btnConfirmarAdelanto.disabled = false;
+      }
     });
   }
 
@@ -744,30 +1321,116 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
     contenedor.innerHTML = '';
 
-    // Por ahora, la pantalla de Horarios usa alertas como "datos faltantes".
-    // Si quieres también ausencias/cambios (dinámica), se conecta después.
-    const lista = document.getElementById('lista-alertas-faltantes');
-    if (lista) {
-      // Ya renderiza en el widget robusto
+    if (modoVista !== 'dinamica') return;
+
+    const alerts = [];
+    for (const a of ausencias_profesor) {
+      if ((a.fecha || fechaDinamica) !== fechaDinamica) continue;
+      const tipoInc = normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo);
+      alerts.push({
+        tipo: (tipoInc === 'ausencia_profesor') ? 'ausencia' : 'incidencia',
+        subtipo: tipoInc,
+        fecha: a.fecha || fechaDinamica,
+        hora: a.hora,
+        id_profesor: a.id_profesor,
+        id_grupo: a.id_grupo,
+        accion_tomada: a.accion_tomada
+      });
+    }
+
+    for (const h of horario_dinamico) {
+      if ((h.fecha || fechaDinamica) !== fechaDinamica) continue;
+      const motivo = String(h.motivo || h.motivo_cambio || '').toLowerCase();
+      if (!motivo.includes('adelanto')) continue;
+      alerts.push({
+        tipo: 'adelanto',
+        fecha: h.fecha || fechaDinamica,
+        hora: h.hora_inicio,
+        id_grupo: h.id_grupo,
+        motivo: h.motivo || h.motivo_cambio || 'Adelanto'
+      });
+    }
+
+    alerts.sort((a, b) => (timeToMinutes(b.hora) ?? 0) - (timeToMinutes(a.hora) ?? 0));
+
+    if (alerts.length === 0 && ultimoErrorDinamica) {
+      const status = ultimoErrorDinamica?.status;
+      const msg = ultimoErrorDinamica?.message || 'No se pudieron cargar las alertas dinámicas.';
+      const div = document.createElement('div');
+      div.className = 'tarjeta-alerta';
+      const esAuth = status === 401 || status === 403;
+      div.innerHTML = `
+        <div class="alerta-icono error">
+          <span class="material-symbols-outlined md-20">error</span>
+        </div>
+        <div class="alerta-texto">
+          <p>${esAuth ? 'Sin sesión / permisos' : 'Error cargando dinámica'}</p>
+          <p>${esAuth ? 'Inicia sesión como prefecto/admin para ver incidencias.' : msg}</p>
+        </div>
+      `;
+      contenedor.appendChild(div);
       return;
     }
 
-    const div = document.createElement('div');
-    div.className = 'tarjeta-alerta';
-    div.innerHTML = `
-      <div class="alerta-icono advertencia">
-        <span class="material-symbols-outlined md-20">info</span>
-      </div>
-      <div class="alerta-texto">
-        <p>Vista robusta conectada</p>
-        <p>Las alertas de faltantes están en el widget robusto.</p>
-      </div>
-    `;
-    contenedor.appendChild(div);
+    if (alerts.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tarjeta-alerta';
+      empty.innerHTML = `
+        <div class="alerta-icono exito">
+          <span class="material-symbols-outlined md-20">check_circle</span>
+        </div>
+        <div class="alerta-texto">
+          <p>Sin alertas</p>
+          <p>No hay incidencias ni adelantamientos hoy.</p>
+        </div>
+      `;
+      contenedor.appendChild(empty);
+      return;
+    }
+
+    alerts.slice(0, 6).forEach((al) => {
+      const div = document.createElement('div');
+      div.className = 'tarjeta-alerta';
+      if (al.tipo === 'ausencia') {
+        const profesor = usuarios.find((u) => Number(u.id_usuarios) === Number(al.id_profesor));
+        const grupo = grupos.find((g) => Number(g.id_grupo) === Number(al.id_grupo));
+        div.innerHTML = `
+          <div class="alerta-icono error">
+            <span class="material-symbols-outlined md-20">person_off</span>
+          </div>
+          <div class="alerta-texto">
+            <p>Ausencia: ${profesor?.nombre || 'Profesor'}</p>
+            <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${al.hora || 'S/H'}</p>
+          </div>
+        `;
+      } else if (al.tipo === 'incidencia') {
+        const grupo = grupos.find((g) => Number(g.id_grupo) === Number(al.id_grupo));
+        div.innerHTML = `
+          <div class="alerta-icono advertencia">
+            <span class="material-symbols-outlined md-20">notifications_active</span>
+          </div>
+          <div class="alerta-texto">
+            <p>Incidencia: ${etiquetaTipoIncidencia(al.subtipo)}</p>
+            <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${al.hora || 'S/H'}</p>
+          </div>
+        `;
+      } else {
+        const grupo = grupos.find((g) => Number(g.id_grupo) === Number(al.id_grupo));
+        div.innerHTML = `
+          <div class="alerta-icono advertencia">
+            <span class="material-symbols-outlined md-20">warning</span>
+          </div>
+          <div class="alerta-texto">
+            <p>Adelanto</p>
+            <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${al.hora || 'S/H'}</p>
+          </div>
+        `;
+      }
+      contenedor.appendChild(div);
+    });
   };
 
   // infodal
-
   const modalDetalle = document.getElementById('modal-detalle');
   const cerrarModalDetalle = document.getElementById('cerrar-modal-detalle');
   const tituloModalDetalle = document.getElementById('titulo-modal-detalle');
@@ -796,17 +1459,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     { id: 14, hora: '20:00 - 20:50' }
   ];
 
-  const timeToMinutes = (t) => {
-    const raw = String(t || '').trim();
-    if (!raw) return null;
-    const m = raw.match(/^(\d{1,2}):(\d{2})/);
-    if (!m) return null;
-    const hh = Number(m[1]);
-    const mm = Number(m[2]);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-    return hh * 60 + mm;
-  };
-
   const horarioSolapaBloque = (h, bloque) => {
     const [ini, fin] = String(bloque?.hora || '')
       .split('-')
@@ -816,7 +1468,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     const hStart = timeToMinutes(h?.hora_inicio);
     const hEnd = timeToMinutes(h?.hora_fin);
     if (bStart === null || bEnd === null || hStart === null || hEnd === null) return false;
-    // overlap: [hStart,hEnd) con [bStart,bEnd)
+    // [hStart,hEnd) con [bStart,bEnd) una vergona esto
     return hStart < bEnd && hEnd > bStart;
   };
 
@@ -964,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       });
     });
 
-    // Día inicial: el mismo que se muestra en la tabla
+    // Día inicial el mismo que se muestra en la tabla
     const btnInit = selectorDiaModal.querySelector(`[data-dia="${diaSeleccionadoModal}"]`);
     if (btnInit) btnInit.classList.add('activo-primario');
   }
@@ -981,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
   });
 
-  // alertas Modal (no se como hacer un switch!!) (checa los datos wenaz)
+  // alertas Modal (no se como hacer un switch!!) (checa los datos wenaz) (no -wenaz)
 
   const modalAlertas = document.getElementById('modal-alertas');
   const cerrarModalAlertas = document.getElementById('cerrar-modal-alertas');
@@ -1007,14 +1659,46 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     cuerpoModalAlertas.innerHTML = '';
     let todasLasAlertas = [];
 
-    // Ian corrige esto cuando lo ocupes
     if (modoVista === 'dinamica') {
-      // Alertas dinamicas: Ausencias/Adelantos
-      ausencias_profesor.forEach(a => todasLasAlertas.push({ ...a, tipo: 'ausencia' }));
-      horario_dinamico.forEach(h => todasLasAlertas.push({ ...h, tipo: 'adelanto' }));
+      // Alertas dinámicas: Incidencias + Adelantos
+      ausencias_profesor
+        .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
+        .forEach((a) => {
+          const subtipo = normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo);
+          todasLasAlertas.push({
+            ...a,
+            tipo: (subtipo === 'ausencia_profesor') ? 'ausencia' : 'incidencia',
+            subtipo
+          });
+        });
+
+      horario_dinamico
+        .filter((h) => (h.fecha || fechaDinamica) === fechaDinamica)
+        .filter((h) => String(h.motivo || h.motivo_cambio || '').toLowerCase().includes('adelanto'))
+        .forEach((h) => todasLasAlertas.push({ ...h, tipo: 'adelanto' }));
     } else {
-      // Alertas robustas: Informacion faltante (No datos, tons simulados)
-      ausencias_profesor.forEach(a => todasLasAlertas.push({ ...a, tipo: 'faltante' }));
+      // Alertas robustas: datos faltantes en Horario_Fijo
+      const grupoPorId = new Map(grupos.map(g => [Number(g.id_grupo), g]));
+      const materiaPorId = new Map(materias.map(m => [Number(m.id_materia), m]));
+      const usuarioPorId = new Map(usuarios.map(u => [Number(u.id_usuarios), u]));
+      const salonPorId = new Map(salones.map(s => [Number(s.id_salon), s]));
+      const hoy = fechaHoyISO();
+
+      for (const h of horario_fijo) {
+        const g = grupoPorId.get(Number(h.id_grupo));
+        const m = materiaPorId.get(Number(h.id_materia));
+        const p = usuarioPorId.get(Number(h.id_profesor));
+        const s = salonPorId.get(Number(h.id_salon));
+        const contexto = `${g?.nombre_grupo || h?.nombre_grupo || 'Grupo'} • ${h?.dia || 'Día'} • ${h?.hora_inicio || '--:--'}-${h?.hora_fin || '--:--'}`;
+
+        if (!g || !g.nombre_grupo) todasLasAlertas.push({ tipo: 'faltante', fecha: hoy, detalle: `Falta Grupo • ${contexto}` });
+        if (!m || !m.nombre_materia) todasLasAlertas.push({ tipo: 'faltante', fecha: hoy, detalle: `Falta Materia • ${contexto}` });
+        if (!p || !p.nombre) todasLasAlertas.push({ tipo: 'faltante', fecha: hoy, detalle: `Falta Profesor • ${contexto}` });
+        if (!s || !s.numero_salon) todasLasAlertas.push({ tipo: 'faltante', fecha: hoy, detalle: `Falta Salón • ${contexto}` });
+        if (h.id_auxiliar && !usuarioPorId.get(Number(h.id_auxiliar))) {
+          todasLasAlertas.push({ tipo: 'faltante', fecha: hoy, detalle: `Falta Prof. Aux. • ${contexto}` });
+        }
+      }
     }
 
     // Descendente, arriba -> abajo, ya cayo?
@@ -1042,7 +1726,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         const div = document.createElement('div');
         div.className = 'tarjeta-alerta';
         
-        if (alerta.tipo === 'ausencia' || alerta.tipo === 'faltante') {
+        if (alerta.tipo === 'ausencia') {
           const profesor = usuarios.find(u => u.id_usuarios === alerta.id_profesor);
           const grupo = grupos.find(g => g.id_grupo === alerta.id_grupo);
           div.innerHTML = `
@@ -1050,20 +1734,44 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
               <span class="material-symbols-outlined md-20">person_off</span>
             </div>
             <div class="alerta-texto">
-              <p>${alerta.tipo === 'ausencia' ? 'Ausencia' : 'Faltante'}: ${profesor?.nombre || 'Profesor'}</p>
+              <p>Ausencia: ${profesor?.nombre || 'Profesor'}</p>
               <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${alerta.hora || 'S/H'}</p>
               <p>${alerta.accion_tomada || 'Sin acción registrada'}</p>
             </div>
           `;
+        } else if (alerta.tipo === 'incidencia') {
+          const grupo = grupos.find(g => g.id_grupo === alerta.id_grupo);
+          div.innerHTML = `
+            <div class="alerta-icono advertencia">
+              <span class="material-symbols-outlined md-20">notifications_active</span>
+            </div>
+            <div class="alerta-texto">
+              <p>Incidencia: ${etiquetaTipoIncidencia(alerta.subtipo)}</p>
+              <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${alerta.hora || 'S/H'}</p>
+              <p>${alerta.accion_tomada || 'Sin acción registrada'}</p>
+            </div>
+          `;
+        } else if (alerta.tipo === 'faltante') {
+          div.innerHTML = `
+            <div class="alerta-icono error">
+              <span class="material-symbols-outlined md-20">database_off</span>
+            </div>
+            <div class="alerta-texto">
+              <p>Dato faltante</p>
+              <p>${alerta.detalle || '—'}</p>
+            </div>
+          `;
         } else if (alerta.tipo === 'adelanto') {
-          const hf = horario_fijo.find(h => h.id_horario_fijo === alerta.id_horario_fijo);
-          const grupo = grupos.find(g => g.id_grupo === hf?.id_grupo);
+          const hf = horario_fijo.find(
+            (h) => Number(h.id_horario_fijo_detalle) === Number(alerta.id_horario_fijo_detalle)
+          );
+          const grupo = grupos.find(g => g.id_grupo === (alerta.id_grupo ?? hf?.id_grupo));
           div.innerHTML = `
             <div class="alerta-icono advertencia">
               <span class="material-symbols-outlined md-20">warning</span>
             </div>
             <div class="alerta-texto">
-              <p>Cambio/Adelanto: ${alerta.motivo_cambio}</p>
+              <p>Cambio/Adelanto: ${alerta.motivo || alerta.motivo_cambio || 'Adelanto'}</p>
               <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${alerta.hora_inicio}</p>
             </div>
           `;
@@ -1884,6 +2592,39 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     await salonSelectorMapApi.setAvailabilityContext(getRangoContext());
   };
 
+  function abrirModalSalonConContexto(ctx) {
+    if (!modalSalon) return;
+    modalSalon.classList.add('activo');
+
+    const mapEl = document.getElementById('reg-salon-map');
+    if (mapEl && !salonSelectorMapApi) {
+      initSalonSelectorMap({
+        rootEl: modalSalon,
+        mapEl,
+        availabilityContext: ctx,
+        onSelect: (sel) => {
+          if (salonModoSeleccion === 'adelanto') {
+            salonSeleccionadoAdelanto = sel;
+            modalSalon.classList.remove('activo');
+            abrirConfirmarAdelanto();
+          } else {
+            salonSeleccionadoRegistro = sel;
+            actualizarBotonSalon(sel);
+            modalSalon.classList.remove('activo');
+          }
+        }
+      })
+        .then((api) => {
+          salonSelectorMapApi = api;
+        })
+        .catch((err) => {
+          console.error('No se pudo inicializar el mapa de salones', err);
+        });
+    } else {
+      salonSelectorMapApi?.setAvailabilityContext?.(ctx).catch?.(() => {});
+    }
+  }
+
   const poblarSelects = () => {
     if (!selectGrupo || !selectMateria || !selectProfesor || !selectProfesorAux) return;
 
@@ -1931,29 +2672,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       e.stopPropagation();
       // Si ya hay un salón elegido, solo abrir si el clic fue en "Cambiar salón"
       if (salonBtn.classList.contains('salon-elegido') && !e.target.closest('.salon-elegido-cambiar')) return;
-      modalSalon.classList.add('activo');
 
-      // Lazy init del mapa para evitar trabajo innecesario
-      const mapEl = document.getElementById('reg-salon-map');
-      if (mapEl && !salonSelectorMapApi) {
-        initSalonSelectorMap({
-          rootEl: modalSalon,
-          mapEl,
-          availabilityContext: getRangoContext(),
-          onSelect: (sel) => {
-            salonSeleccionadoRegistro = sel;
-            actualizarBotonSalon(sel);
-            modalSalon.classList.remove('activo');
-          }
-        }).then((api) => {
-          salonSelectorMapApi = api;
-        }).catch((err) => {
-          console.error('No se pudo inicializar el mapa de salones', err);
-        });
-      } else {
-        // Si ya está inicializado, refrescar ocupación por el rango actual
-        refrescarDisponibilidadMapa().catch(() => {});
-      }
+      salonModoSeleccion = 'registro';
+      salonSeleccionadoAdelanto = null;
+      abrirModalSalonConContexto(getRangoContext());
     });
   }
 
@@ -2112,6 +2834,29 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   const incProfesorContainer = document.getElementById('inc-profesor-container');
   const incProfesorEl = document.getElementById('inc-profesor');
 
+  const formatPeriodoWidget = (horaInicio, horaFin) => {
+    const ini = String(horaInicio || '').trim();
+    const fin = String(horaFin || '').trim();
+    if (!ini || !fin) return `${ini || '-'} - ${fin || '-'}`;
+
+    const iniMatch = ini.match(/^(\d{1,2}):(\d{2})/);
+    const finMatch = fin.match(/^(\d{1,2}):(\d{2})/);
+    if (!iniMatch || !finMatch) return `${ini} - ${fin}`;
+
+    const iniMin = (parseInt(iniMatch[1], 10) * 60) + parseInt(iniMatch[2], 10);
+    const finMinRaw = (parseInt(finMatch[1], 10) * 60) + parseInt(finMatch[2], 10);
+    if (!Number.isFinite(iniMin) || !Number.isFinite(finMinRaw)) return `${ini} - ${fin}`;
+
+    let finMin = finMinRaw;
+    if (finMinRaw > iniMin && finMinRaw % 60 === 0) {
+      finMin = finMinRaw - 10;
+    }
+
+    const hh = String(Math.floor(finMin / 60)).padStart(2, '0');
+    const mm = String(finMin % 60).padStart(2, '0');
+    return `${iniMatch[1].padStart(2, '0')}:${iniMatch[2]} - ${hh}:${mm}`;
+  };
+
   const abrirModalInfo = (horario) => { // info de horario fijo o dinamico, dependiendo de donde se haya hecho click (pq ambos abren el mismo widget)
     if (!modalInfo) return;
     const grupo = grupos.find(g => g.id_grupo === horario.id_grupo);
@@ -2142,8 +2887,13 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
     const infoPeriodoEl = document.getElementById('info-periodo'); // si el bloque no se encuentra, mostrar horas en vez de periodo (stack overflow!!!)
     if (infoPeriodoEl) {
-      if (bloque) infoPeriodoEl.textContent = `${bloque.hora}`;
-      else infoPeriodoEl.textContent = `${horario?.hora_inicio || '-'} - ${horario?.hora_fin || '-'}`;
+      if (horario?.hora_inicio && horario?.hora_fin) {
+        infoPeriodoEl.textContent = formatPeriodoWidget(horario.hora_inicio, horario.hora_fin);
+      } else if (bloque) {
+        infoPeriodoEl.textContent = `${bloque.hora}`;
+      } else {
+        infoPeriodoEl.textContent = '-';
+      }
     }
     // Mostrar/ocultar acciones según modo
     if (infoBotonAccion) {
@@ -2220,28 +2970,111 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   }
 
   if (formRegistrarIncidencia) {
-    formRegistrarIncidencia.addEventListener('submit', (e) => {
+    formRegistrarIncidencia.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const tipo = incTipoEl?.value || '';
-      const horaRegistro = incHoraEl?.value || null;
-      const contexto = incContextoEl?.value || '';
-      const profesorSeleccionado = incProfesorEl?.value || null;
+      const tipoRaw = incTipoEl?.value || '';
+      const tipo = normalizarTipoIncidencia(tipoRaw);
+      // Usamos el selector como accion_tomada directamente
+      const contexto = tipo;
+
+      const horaRegistro = (tipo === 'ausencia_profesor')
+        ? (incHoraEl?.value || null)
+        : (horarioActualEnWidget?.hora_inicio || null);
+
+      const profesorSeleccionado = (tipo === 'ausencia_profesor')
+        ? (incProfesorEl?.value || null)
+        : (horarioActualEnWidget?.id_profesor != null ? String(horarioActualEnWidget.id_profesor) : null);
 
       if (!tipo) { alert('Selecciona un tipo de incidencia'); return; }
 
-      const incObj = {
-        tipo,
-        hora: horaRegistro,
-        contexto,
-        profesor_ausente_id: profesorSeleccionado,
-        horario: horarioActualEnWidget ? { id_grupo: horarioActualEnWidget.id_grupo, id_materia: horarioActualEnWidget.id_materia, id_profesor: horarioActualEnWidget.id_profesor, id_profesor_aux: horarioActualEnWidget.id_profesor_aux, bloque: horarioActualEnWidget.bloque_horario, hora_inicio: horarioActualEnWidget.hora_inicio } : null,
-        creado_en: new Date().toISOString()
-      };
+      if (!horarioActualEnWidget?.id_grupo) {
+        alert('No se pudo identificar el grupo del horario.');
+        return;
+      }
+      if (!horaRegistro) {
+        alert('Selecciona la hora de la incidencia.');
+        return;
+      }
+      if (!profesorSeleccionado) {
+        alert(tipo === 'ausencia_profesor'
+          ? 'Selecciona el profesor ausente.'
+          : 'No se pudo identificar el profesor del horario.'
+        );
+        return;
+      }
 
-      console.log('Incidencia registrada (sim):', incObj);
-      alert('Incidencia registrada (simulación)');
-      modalRegistrarIncidencia.classList.remove('activo');
-      if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
+      try {
+        await fetchJson('/ausencias', {
+          method: 'POST',
+          auth: true,
+          body: {
+            fecha: fechaDinamica,
+            hora: hhmm(horaRegistro),
+            id_profesor: Number(profesorSeleccionado),
+            id_grupo: Number(horarioActualEnWidget.id_grupo),
+            accion_tomada: (contexto || '').trim() || tipo
+          }
+        });
+
+        // Optimista: reflejar de inmediato sin depender del GET
+        const nuevaAusencia = {
+          fecha: fechaDinamica,
+          hora: hhmm(horaRegistro),
+          id_profesor: Number(profesorSeleccionado),
+          id_grupo: Number(horarioActualEnWidget.id_grupo),
+          accion_tomada: (contexto || '').trim() || tipo
+        };
+        ausencias_profesor = (ausencias_profesor || []).filter((a) => !(
+          (a.fecha || fechaDinamica) === nuevaAusencia.fecha &&
+          Number(a.id_profesor) === nuevaAusencia.id_profesor &&
+          Number(a.id_grupo) === nuevaAusencia.id_grupo &&
+          hhmm(a.hora) === nuevaAusencia.hora &&
+          // Compare by accion_tomada (selector value stored there)
+          normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo ?? parseTipoDesdeAccion(a.accion_tomada) ?? a.accion_tomada) === normalizarTipoIncidencia(nuevaAusencia.accion_tomada)
+        ));
+        ausencias_profesor.push(nuevaAusencia);
+        ultimoErrorDinamica = null;
+
+        // Asegurar que el usuario vea el efecto (alertas + rojo) en dinámica
+        if (modoVista !== 'dinamica') {
+          modoVista = 'dinamica';
+          const selectorModo = document.getElementById('selector-modo-vista');
+          if (selectorModo) {
+            selectorModo.querySelectorAll('button').forEach((b) => {
+              b.classList.toggle('activo', b.getAttribute('data-modo') === 'dinamica');
+            });
+          }
+          const widgetsDinamicos = document.getElementById('widgets-dinamicos');
+          const widgetsRobustos = document.getElementById('widgets-robustos');
+          const botonNuevo = document.getElementById('boton-nuevo-registro');
+          if (widgetsDinamicos) widgetsDinamicos.classList.remove('oculto');
+          if (widgetsRobustos) widgetsRobustos.classList.add('oculto');
+          if (botonNuevo) botonNuevo.classList.add('oculto');
+        }
+
+        // Pintar inmediato
+        renderizarAlertas();
+        renderizarAdelantos();
+        renderizarTabla();
+
+        // Sync con backend
+        await cargarDatosDinamica(fechaDinamica);
+        renderizarAlertas();
+        renderizarAdelantos();
+        renderizarTabla();
+
+        alert('Incidencia registrada');
+        modalRegistrarIncidencia.classList.remove('activo');
+        formRegistrarIncidencia.reset();
+      } catch (err) {
+        const status = err?.status;
+        const msg = err?.message || 'No se pudo registrar la incidencia.';
+        if (status === 401 || status === 403) {
+          alert(`Sin permisos (necesitas sesión prefecto/admin): ${msg}`);
+        } else {
+          alert(msg);
+        }
+      }
     });
   }
 
@@ -2258,6 +3091,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
   });
 
+  paintSessionHeader();
+  
   const perfilBtn = document.getElementById('perfil-usuario-btn');
   const menuPerfilUsuario = document.getElementById('menu-perfil-usuario');
   if (perfilBtn && menuPerfilUsuario) {

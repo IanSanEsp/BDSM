@@ -13,6 +13,7 @@ const DIAS_POR_NUMERO = [
 ];
 
 const _columnCache = new Map();
+const _tableCache = new Map();
 
 async function tableHasColumn(tableName, columnName) {
   const key = `${tableName}.${columnName}`;
@@ -27,6 +28,20 @@ async function tableHasColumn(tableName, columnName) {
   );
   const has = !!(rows && rows[0] && Number(rows[0].cnt) > 0);
   _columnCache.set(key, has);
+  return has;
+}
+
+async function tableExists(tableName) {
+  if (_tableCache.has(tableName)) return _tableCache.get(tableName);
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?`,
+    [tableName]
+  );
+  const has = !!(rows && rows[0] && Number(rows[0].cnt) > 0);
+  _tableCache.set(tableName, has);
   return has;
 }
 
@@ -54,17 +69,23 @@ async function getOrCreateHorarioIdByGrupo(id_grupo, nombre_horario) {
       : `Horario Grupo ${id_grupo}`;
 
 
+  // La tabla horarios no tiene AUTO_INCREMENT, calcular siguiente ID
+  const [maxRow] = await db.query("SELECT COALESCE(MAX(id_horario_fijo), 0) + 1 AS next_id FROM horarios");
+  const nextId = maxRow && maxRow[0] ? Number(maxRow[0].next_id) : 1;
+
   const hasGrupoHorario = await tableHasColumn("horarios", "grupo_horario");
-  const [ins] = hasGrupoHorario
-    ? await db.query(
-        "INSERT INTO horarios (id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?)",
-        [id_grupo, id_grupo, nombre]
-      )
-    : await db.query(
-        "INSERT INTO horarios (id_grupo, nombre_horario) VALUES (?, ?)",
-        [id_grupo, nombre]
-      );
-  return ins.insertId;
+  if (hasGrupoHorario) {
+    await db.query(
+      "INSERT INTO horarios (id_horario_fijo, id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?, ?)",
+      [nextId, id_grupo, id_grupo, nombre]
+    );
+  } else {
+    await db.query(
+      "INSERT INTO horarios (id_horario_fijo, id_grupo, nombre_horario) VALUES (?, ?, ?)",
+      [nextId, id_grupo, nombre]
+    );
+  }
+  return nextId;
 }
 
 function validarHoraHHMM(h) {
@@ -232,6 +253,44 @@ export const listarProfesoresCatalogo = async (_req, res) => {
     return res.json({ profesores });
   } catch (err) {
     console.error('Error al listar profesores:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// Catálogo: todas las materias (aunque no tengan horarios)
+export const listarMateriasCatalogo = async (_req, res) => {
+  try {
+    const hasMaterias = await tableExists('Materias');
+    const hasMateriaLegacy = await tableExists('materia');
+
+    if (!hasMaterias && !hasMateriaLegacy) {
+      return res.json({ materias: [] });
+    }
+
+    const [rows] = hasMaterias
+      ? await db.query(
+          `SELECT m.id_materia,
+                  m.nombre_materia,
+                  m.area_estudio
+           FROM Materias m
+           ORDER BY (m.nombre_materia IS NULL) ASC, m.nombre_materia ASC, m.id_materia ASC`
+        )
+      : await db.query(
+          `SELECT m.id_materia,
+                  m.sig_nombre AS nombre_materia
+           FROM materia m
+           ORDER BY (m.sig_nombre IS NULL) ASC, m.sig_nombre ASC, m.id_materia ASC`
+        );
+
+    const materias = (rows || []).map((r) => ({
+      id_materia: r.id_materia,
+      nombre_materia: r.nombre_materia || null,
+      area_estudio: r.area_estudio || null
+    }));
+
+    return res.json({ materias });
+  } catch (err) {
+    console.error('Error al listar materias:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
@@ -440,7 +499,7 @@ export const eliminarHorario = async (req, res) => {
 // Buscar por bloque de horario
 export const buscarPorBloque = async (req, res) => {
   try {
-    const { dia, hora_inicio, hora_fin } = req.query || {};
+    const { dia, hora_inicio, hora_fin, fecha } = req.query || {};
     if (!dia || !hora_inicio || !hora_fin) {
       return res.status(400).json({ error: "Faltan parámetros: dia, hora_inicio, hora_fin" });
     }
@@ -453,24 +512,31 @@ export const buscarPorBloque = async (req, res) => {
     const hi = toTimeWithSeconds(hora_inicio);
     const hf = toTimeWithSeconds(hora_fin);
 
+    const fechaStr = String(fecha || '').trim();
+    const usarDinamico = !!fechaStr;
+
     const [rows] = await db.query(
       `SELECT hf.id_horario_fijo_detalle,
               hf.id_horario_fijo,
               h.id_grupo,
               hf.dia,
-              hf.hora_inicio,
-              hf.hora_fin,
+              ${usarDinamico ? 'COALESCE(hd.hora_inicio, hf.hora_inicio) AS hora_inicio,' : 'hf.hora_inicio,'}
+              ${usarDinamico ? 'COALESCE(hd.hora_fin, hf.hora_fin) AS hora_fin,' : 'hf.hora_fin,'}
               hf.bloque_horario,
-              g.nombre_grupo, u.nombre AS nombre_profesor, s.nombre_salon
+              g.nombre_grupo, u.nombre AS nombre_profesor,
+              ${usarDinamico ? 'COALESCE(s2.nombre_salon, s.nombre_salon) AS nombre_salon' : 's.nombre_salon'}
        FROM Horario_Fijo hf
        JOIN horarios h ON hf.id_horario_fijo = h.id_horario_fijo
        JOIN Grupos g ON h.id_grupo = g.id_grupo
        JOIN Profesores p ON hf.id_profesor = p.id_profesor
        JOIN Usuarios u ON p.id_profesor = u.id_usuarios
        JOIN Salones s ON hf.id_salon = s.id_salon
-       WHERE hf.dia = ? AND NOT (hf.hora_fin <= ? OR hf.hora_inicio >= ?)
-       ORDER BY hf.hora_inicio`,
-      [dia, hi, hf]
+       ${usarDinamico ? 'LEFT JOIN Horario_Dinamico hd ON hd.id_horario_fijo_detalle = hf.id_horario_fijo_detalle AND hd.fecha = ?' : ''}
+       ${usarDinamico ? 'LEFT JOIN Salones s2 ON hd.id_salon_temporal = s2.id_salon' : ''}
+       WHERE hf.dia = ?
+         AND NOT (${usarDinamico ? 'COALESCE(hd.hora_fin, hf.hora_fin)' : 'hf.hora_fin'} <= ? OR ${usarDinamico ? 'COALESCE(hd.hora_inicio, hf.hora_inicio)' : 'hf.hora_inicio'} >= ?)
+       ORDER BY ${usarDinamico ? 'COALESCE(hd.hora_inicio, hf.hora_inicio)' : 'hf.hora_inicio'}`,
+      usarDinamico ? [fechaStr, dia, hi, hf] : [dia, hi, hf]
     );
 
     return res.json({ horarios: rows });
@@ -665,10 +731,12 @@ export const adelantarClase = async (req, res) => {
 
     const diaDin = hf.dia || diaFecha;
 
-    // Igual que en reasignarSalon: se reemplaza el cambio de esta clase (detalle)
+    // Solo borrar registros dinámicos que solapan con el nuevo (permite múltiples adelantos no superpuestos)
     await db.query(
-      "DELETE FROM Horario_Dinamico WHERE id_horario_fijo_detalle = ? AND fecha = ?",
-      [hf.id_horario_fijo_detalle, fecha]
+      `DELETE FROM Horario_Dinamico
+       WHERE id_horario_fijo_detalle = ? AND fecha = ?
+         AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
+      [hf.id_horario_fijo_detalle, fecha, hi, hfTime]
     );
 
     const [sRows] = await db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [salonDestino]);
@@ -745,10 +813,15 @@ export const tablaDinamicaPorFecha = async (req, res) => {
       return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
     }
 
-    let sql = `SELECT hf.id_horario_fijo, hf.dia, hf.hora_inicio, hf.hora_fin, hf.bloque_horario,
-                      g.nombre_grupo, u.nombre AS nombre_profesor,
-                      m.nombre_materia AS materia, m.area_estudio,
-                      s.id_salon, s.nombre_salon, s.piso,
+    let sql = `SELECT hf.id_horario_fijo_detalle,
+              hf.id_horario_fijo,
+              h.id_grupo,
+              hf.id_profesor,
+              hf.id_materia,
+              hf.dia, hf.hora_inicio, hf.hora_fin, hf.bloque_horario,
+              g.nombre_grupo, u.nombre AS nombre_profesor,
+              m.nombre_materia AS materia, m.area_estudio,
+              s.id_salon, s.nombre_salon, s.piso,
                       hd.id_horario_dinamico, hd.id_salon_temporal, s2.nombre_salon AS nombre_salon_temporal,
                       hd.hora_inicio AS hora_inicio_temp, hd.hora_fin AS hora_fin_temp, hd.motivo_cambio AS motivo
                FROM Horario_Fijo hf
