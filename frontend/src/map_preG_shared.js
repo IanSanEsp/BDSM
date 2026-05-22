@@ -1,5 +1,5 @@
-export const DEFAULT_API_URL = 'http://localhost:3000/api'; // Cambiar cuando ya este en railway
-
+export const DEFAULT_API_URL = 'bdsm-production-8774.up.railway.app'; // Cambiar cuando ya este en railway
+//http://localhost:3000/api
 export const TOKEN_KEY = 'bdsm_token';
 export const USER_KEY = 'bdsm_usuario';
 
