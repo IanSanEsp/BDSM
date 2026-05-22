@@ -8,7 +8,6 @@ const ADMIN_VALUES = ["admin", "administrador", "adminisrtrador"];
 async function resolveCatalogId({ table, idColumn, nameColumn, value }) {
   if (value === undefined || value === null || value === "") return null;
 
-  // Si ya es número, úsalo directo
   const asNumber = Number(value);
   if (!Number.isNaN(asNumber) && Number.isInteger(asNumber)) {
     const [rows] = await db.query(
@@ -18,7 +17,7 @@ async function resolveCatalogId({ table, idColumn, nameColumn, value }) {
     return rows && rows[0] ? rows[0].id : null;
   }
 
-  // Si es string, resolver por nombre
+  // Si es string resolver por nombre
   const [rows] = await db.query(
     `SELECT ${idColumn} AS id FROM ${table} WHERE ${nameColumn} = ? LIMIT 1`,
     [String(value)]
@@ -175,7 +174,7 @@ export const registrarUsuario = async (req, res) => {
       [idUsuarioNum, nombre, tipoUsuarioId, correo, hash, turno, idGrupoFinal]
     );
 
-    // mysql2 devuelve affectedRows, no insertId (no autoincrement aquí)
+    // mysql2 devuelve affectedRows, no insertId (no autoincrement aquí :( )
     const newId = idUsuarioNum;
 
     // Crear registros relacionados según rol
@@ -400,7 +399,6 @@ export const eliminarUsuario = async (req, res) => {
   }
 };
 
-// RF.RU.07: asignar prefecto de piso
 export const asignarPrefectoPiso = async (req, res) => {
   try {
     const id = Number(req.params.id);

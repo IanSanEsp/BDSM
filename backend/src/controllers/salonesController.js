@@ -27,7 +27,6 @@ export const crearSalon = async (req, res) => {
       nombre_salon,
       piso,
       tipo_salon,
-      // compatibilidad: algunos clientes mandan `tipo`
       tipo,
       estado
     } = req.body || {};

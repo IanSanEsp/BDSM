@@ -1,24 +1,13 @@
-import { 
-  salones, 
-  horario_fijo, 
-  materias, 
-  profesores, 
-  grupos,
-  usuarios,
-  horario_dinamico,
-  ausencias_profesor
-} from './mockData.js';
-
 import {
   COLORES,
-  DEFAULT_API_URL,
   LAYOUT_PISOS,
   clearSession,
   paintSessionHeader,
   keySalonName,
   normalizarEstado,
   resolveApiBase,
-  stripSalonPrefix
+  stripSalonPrefix,
+  getSessionToken
 } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,9 +37,42 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let pisoActual = '3';
+  let paginaActual = 1;
+  let apiBase = resolveApiBase();
+
+  // Datos cargados desde API
+  let salonesData = [];
+  let horariosData = [];
+  let gruposData = [];
+  let ausenciasData = [];
+  let dinamicaData = [];
+
+  const fetchJson = async (pathOrUrl, { method = 'GET', body, auth = false } = {}) => {
+    const isFullUrl = pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://');
+    const baseUrl = isFullUrl ? '' : apiBase;
+    const url = baseUrl + pathOrUrl;
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth) headers['Authorization'] = `Bearer ${getSessionToken()}`;
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error || `Error ${res.status}`);
+    }
+    return res.json();
+  };
+
+  const pisoCoincide = (obj) => {
+    const target = pisoActual === 'L' ? '0' : String(pisoActual);
+    return String(obj.piso) === target;
+  };
+
+  const hoyISO = () => new Date().toISOString().split('T')[0];
 
   const NS = 'http://www.w3.org/2000/svg';
-  let apiBase = resolveApiBase();
 
   const MAPA_PREVIEW_SRC = {
     L: 'src/img/maps/PB09.png',
@@ -107,32 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(keys);
   }
 
-  async function cargarSalonesPreview(piso) {
-    const pisoDb = piso === 'L' ? '0' : String(piso);
-    try {
-      const res = await fetch(`${apiBase}/salones?piso=${encodeURIComponent(pisoDb)}`);
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : (data.salones || data.rows || []);
-      return rows;
-    } catch (e) {
-      if (apiBase !== DEFAULT_API_URL) {
-        try {
-          const res2 = await fetch(`${DEFAULT_API_URL}/salones?piso=${encodeURIComponent(pisoDb)}`);
-          const data2 = await res2.json();
-          const rows2 = Array.isArray(data2) ? data2 : (data2.salones || data2.rows || []);
-          apiBase = DEFAULT_API_URL;
-          return rows2;
-        } catch {
-          // yano se q hize con tanto try catch (q no lo vea niño)
-          return null;
-        }
-      }
-    }
-
-    // fallback: mock data (mantiene el dashboard útil sin backend)
-    return salones.filter(s => String(s.piso) === String(piso));
-  }
-
   async function renderizarOverlayMapaPreview() {
     const overlay = document.getElementById('mapa-preview-overlay');
     if (!overlay) return;
@@ -147,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     overlay.innerHTML = '';
 
-    const rows = await cargarSalonesPreview(pisoActual);
+    const rows = salonesData.filter(s => pisoCoincide(s));
 
     const estadoPorKey = new Map();
     for (const row of rows) {
@@ -204,6 +200,20 @@ document.addEventListener('DOMContentLoaded', () => {
     { id: 14, hora: '20:00 - 20:50', inicio: '20:00', fin: '20:50' }
   ];
 
+  const claseEnBloque = (clase, bloqueId) => {
+    if (!clase || bloqueId == null) return false;
+    const [cH, cM] = String(clase.hora_inicio).split(':').map(Number);
+    const [cFH, cFM] = String(clase.hora_fin).split(':').map(Number);
+    if (isNaN(cH) || isNaN(cM) || isNaN(cFH) || isNaN(cFM)) return false;
+    const claseIni = cH * 60 + cM;
+    const claseFin = cFH * 60 + cFM;
+    const bloque = bloquesHorarios.find(b => b.id === bloqueId);
+    if (!bloque) return false;
+    const [bH, bM] = bloque.inicio.split(':').map(Number);
+    const bloqueIni = bH * 60 + bM;
+    return claseIni <= bloqueIni && claseFin > bloqueIni;
+  };
+
   const obtenerBloqueActualId = () => { // Devuelve el ID del bloque horario actual basado en la hora real
     const ahora = new Date();
     const horaMinutos = ahora.getHours() * 60 + ahora.getMinutes();
@@ -228,15 +238,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const resumenProvisionales = document.getElementById('resumen-provisionales');
   const resumenMantenimiento = document.getElementById('resumen-mantenimiento');
 
-  const renderizarEstadisticas = () => { // Filtrar salones por piso
-    const salonesPiso = salones.filter(s => s.piso === pisoActual);
+  const renderizarEstadisticas = () => {
+    const salonesPiso = salonesData.filter(s => pisoCoincide(s));
     const total = salonesPiso.length;
     
-    const stats = { // Contar cada estado
+    const stats = {
       disponibles: salonesPiso.filter(s => s.estado === 'Disponible').length,
       ocupadas: salonesPiso.filter(s => s.estado === 'Ocupado').length,
       provisionales: salonesPiso.filter(s => s.estado === 'Provisional').length,
-      mantenimiento: salonesPiso.filter(s => s.estado === 'Mantenimiento').length
+      mantenimiento: salonesPiso.filter(s => s.estado === 'Mantenimiento' || s.estado === 'En Mantenimiento').length
     };
 
     // Actualizar numeros
@@ -287,7 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
       tabsPiso.forEach(t => t.classList.remove('activo-primario'));
       tab.classList.add('activo-primario');
       pisoActual = tab.dataset.piso;
-      
+      paginaActual = 1;
+
       if (tituloMapaPiso) tituloMapaPiso.textContent = `MAPA PISO ${pisoActual === 'L' ? 'L' : pisoActual}`; // Actualizar datos mostrados
 
       actualizarMapaPreview();
@@ -302,50 +313,84 @@ document.addEventListener('DOMContentLoaded', () => {
   const listaSalonesContenedor = document.getElementById('lista-salones-dashboard');
   const conteoSalonesPiso = document.getElementById('conteo-salones-piso');
 
-  const renderizarSalones = () => { // Filtrar salones por piso
+  const renderizarPaginacion = (totalPaginas) => {
+    const paginacionDiv = document.querySelector('.paginacion');
+    if (!paginacionDiv) return;
+
+    paginacionDiv.innerHTML = '';
+
+    const btnAnt = document.createElement('button');
+    btnAnt.className = 'btn-pag';
+    btnAnt.textContent = 'Anterior';
+    btnAnt.disabled = paginaActual <= 1;
+    btnAnt.addEventListener('click', () => {
+      if (paginaActual > 1) { paginaActual--; renderizarSalones(); }
+    });
+    paginacionDiv.appendChild(btnAnt);
+
+    for (let i = 1; i <= totalPaginas; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-pag' + (i === paginaActual ? ' activo' : '');
+      btn.textContent = i;
+      btn.addEventListener('click', () => { paginaActual = i; renderizarSalones(); });
+      paginacionDiv.appendChild(btn);
+    }
+
+    const btnSig = document.createElement('button');
+    btnSig.className = 'btn-pag';
+    btnSig.textContent = 'Siguiente';
+    btnSig.disabled = paginaActual >= totalPaginas;
+    btnSig.addEventListener('click', () => {
+      if (paginaActual < totalPaginas) { paginaActual++; renderizarSalones(); }
+    });
+    paginacionDiv.appendChild(btnSig);
+  };
+
+  const renderizarSalones = () => {
     if (!listaSalonesContenedor) return;
 
-    const salonesPiso = salones.filter(s => s.piso === pisoActual);
+    const salonesPiso = salonesData.filter(s => pisoCoincide(s));
     const diaActual = obtenerDiaActual();
     const bloqueActualId = obtenerBloqueActualId();
-    
+    const itemsPorPagina = 7;
+    const totalPaginas = Math.max(1, Math.ceil(salonesPiso.length / itemsPorPagina));
+    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+    const inicio = (paginaActual - 1) * itemsPorPagina;
+    const salonesPagina = salonesPiso.slice(inicio, inicio + itemsPorPagina);
+
     listaSalonesContenedor.innerHTML = '';
 
-    salonesPiso.forEach(salon => {
-      // Buscar horario actual basado en tiempo real
-      const horarioActual = horario_fijo.find(h => 
-        h.id_salon === salon.id_salon && 
-        h.dia === diaActual && 
-        h.bloque_horario === bloqueActualId
+    salonesPagina.forEach(salon => {
+      const horarioActual = horariosData.find(h =>
+        Number(h.id_salon) === Number(salon.id_salon) &&
+        String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
+        claseEnBloque(h, bloqueActualId)
       );
 
-      const materia = horarioActual ? materias.find(m => m.id_materia === horarioActual.id_materia) : null;
-      const profesor = horarioActual ? usuarios.find(u => u.id_usuarios === horarioActual.id_profesor) : null;
-      const grupo = horarioActual ? grupos.find(g => g.id_grupo === horarioActual.id_grupo) : null;
+      const nombreSalon = obtenerNombreSalon(salon);
 
-      //  Determinar estado visual del salon (puede cambiar temporalmente si hay horario)
-      let estadoVisual = salon.estado.toLowerCase();
+      let estadoVisual = String(salon.estado || '').toLowerCase();
       if (horarioActual && estadoVisual === 'disponible') {
         estadoVisual = 'ocupado';
       } else if (!horarioActual && estadoVisual === 'ocupado') {
         estadoVisual = 'disponible';
       }
 
-      const tr = document.createElement('tr'); // Crear fila para el salón
+      const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
           <div class="salon-id-celda ${estadoVisual}">
             <span class="punto-estado ${estadoVisual}"></span>
-            <span>${salon.numero_salon}</span>
+            <span>${nombreSalon}</span>
           </div>
         </td>
         <td>
-          <span class="grupo-celda">${grupo ? grupo.nombre_grupo : '----'}</span>
+          <span class="grupo-celda">${horarioActual?.nombre_grupo || '----'}</span>
         </td>
         <td>
           <div class="materia-profesor-celda">
-            <span class="materia-nombre">${materia ? materia.nombre_materia : '-- --'}</span>
-            <span class="profesor-nombre">${profesor ? profesor.nombre : '----'}</span>
+            <span class="materia-nombre">${horarioActual?.materia || '-- --'}</span>
+            <span class="profesor-nombre">${horarioActual?.nombre_profesor || '----'}</span>
           </div>
         </td>
         <td>
@@ -373,14 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </td>
       `;
 
-      // Click en la fila para ver horario completo
       tr.addEventListener('click', (e) => {
         if (!e.target.closest('.contenedor-menu-kebab')) {
           abrirModalHorario(salon);
         }
       });
 
-      // Logica del menu kebab ñam
       const btnKebab = tr.querySelector('.boton-kebab');
       const menuKebab = tr.querySelector('.menu-desplegable');
       const btnIncidencia = tr.querySelector('.btn-incidencia');
@@ -388,31 +431,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
       btnKebab.addEventListener('click', (e) => {
         e.stopPropagation();
-        // Cerrar otros menus abiertos
         document.querySelectorAll('.menu-desplegable.activo').forEach(m => {
           if (m !== menuKebab) m.classList.remove('activo');
         });
         menuKebab.classList.toggle('activo');
       });
 
-      btnIncidencia.addEventListener('click', (e) => { // Abrir modal de incidencia con contexto del horario actual
+      btnIncidencia.addEventListener('click', (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
         abrirModalIncidencia(salon, horarioActual);
       });
 
-      btnMantenimiento.addEventListener('click', (e) => { // Esto lo tienes que cambiar ian (orita n hace nada)
+      btnMantenimiento.addEventListener('click', (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
-        alert(`Cambiando salón ${salon.numero_salon} a estado de mantenimiento (Simulación)`);
+        alert(`Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`);
       });
 
-      listaSalonesContenedor.appendChild(tr); // Agregar la fila al contenedor de la tabla
+      listaSalonesContenedor.appendChild(tr);
     });
 
     if (conteoSalonesPiso) {
-      conteoSalonesPiso.textContent = `Mostrando ${salonesPiso.length} de ${salonesPiso.length} salones en este piso.`; // Total de salones por piso (cambialo si ocupas)
+      const desde = salonesPiso.length === 0 ? 0 : inicio + 1;
+      const hasta = Math.min(inicio + itemsPorPagina, salonesPiso.length);
+      conteoSalonesPiso.textContent = `Mostrando ${desde}-${hasta} de ${salonesPiso.length} salones en este piso.`;
     }
+
+    renderizarPaginacion(totalPaginas);
   };
 
   // Modal Horario de Salo
@@ -425,32 +471,28 @@ document.addEventListener('DOMContentLoaded', () => {
   let salonSeleccionado = null; 
   let diaSeleccionadoModal = 'Lunes';
 
-  const actualizarTablaHorarioModal = () => { // Llena la tabla del modal de horario basado en el salon y dia seleccionado
+  const actualizarTablaHorarioModal = () => {
     if (!salonSeleccionado || !cuerpoTablaHorario) return;
 
     cuerpoTablaHorario.innerHTML = '';
 
-    bloquesHorarios.forEach(bloque => { // Para cada bloque horario, buscar si hay una clase programada en el horario fijo para salon
-      const h = horario_fijo.find(h => 
-        h.id_salon === salonSeleccionado.id_salon && 
-        h.dia === diaSeleccionadoModal && 
-        h.bloque_horario === bloque.id
-      );
+    const clasesDelDia = horariosData.filter(h =>
+      Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
+      String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase()
+    );
 
-      const fila = document.createElement('tr'); // Crear fila para el bloque horario
+    bloquesHorarios.forEach(bloque => {
+      const h = clasesDelDia.find(c => claseEnBloque(c, bloque.id));
+
+      const fila = document.createElement('tr');
       if (h) {
-        const materia = materias.find(m => m.id_materia === h.id_materia);
-        const profesor = usuarios.find(u => u.id_usuarios === h.id_profesor);
-        const grupo = grupos.find(g => g.id_grupo === h.id_grupo);
-        
-        // Si hay clase programada, mostrar info de materia, profesor y grupo
         fila.innerHTML = `
           <td><strong>${bloque.hora}</strong></td>
-          <td>${grupo?.nombre_grupo || '-'}</td>
-          <td>${materia?.nombre_materia || '-'}</td>
-          <td>${profesor?.nombre || '-'}</td>
+          <td>${h.nombre_grupo || '-'}</td>
+          <td>${h.materia || '-'}</td>
+          <td>${h.nombre_profesor || '-'}</td>
         `;
-      } else { // Si no hay clase programada, mostrar "Sin clase"
+      } else {
         fila.innerHTML = `
           <td><strong>${bloque.hora}</strong></td>
           <td colspan="3" style="color: #9ca3af; font-style: italic;">Sin clase</td>
@@ -460,12 +502,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const abrirModalHorario = (salon) => { // Abrir modal de horario para el salón seleccionado
+  const abrirModalHorario = (salon) => {
     if (!modalHorario) return;
-    
+
     salonSeleccionado = salon;
-    tituloModal.textContent = `Horario de Salón ${salon.numero_salon}`;
-    
+    tituloModal.textContent = `Horario de Salón ${obtenerNombreSalon(salon)}`;
+
     actualizarTablaHorarioModal();
     modalHorario.classList.add('activo');
   };
@@ -506,22 +548,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const abrirModalIncidencia = (salon, horario) => {
     if (!modalRegistrarIncidencia) return;
     horarioActualEnWidget = horario || null;
-    // Resetear formulario y estados
     if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
     if (incHoraContainer) incHoraContainer.classList.add('oculto');
     if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
     if (incProfesorEl) {
       incProfesorEl.innerHTML = '<option value="">Seleccionar Profesor</option>';
       if (horarioActualEnWidget) {
-        const prof = usuarios.find(u => u.id_usuarios === horarioActualEnWidget.id_profesor);
-        const profAux = usuarios.find(u => u.id_usuarios === horarioActualEnWidget.id_profesor_aux);
-        if (prof) {
-          const o = document.createElement('option'); o.value = prof.id_usuarios; o.textContent = prof.nombre + ' (Titular)';
+        if (horarioActualEnWidget.nombre_profesor) {
+          const o = document.createElement('option');
+          o.value = horarioActualEnWidget.id_profesor;
+          o.textContent = horarioActualEnWidget.nombre_profesor + ' (Titular)';
           incProfesorEl.appendChild(o);
-        }
-        if (profAux) {
-          const o2 = document.createElement('option'); o2.value = profAux.id_usuarios; o2.textContent = profAux.nombre + ' (Auxiliar)';
-          incProfesorEl.appendChild(o2);
         }
       }
     }
@@ -613,76 +650,74 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tituloMapaPiso) tituloMapaPiso.textContent = `MAPA PISO ${pisoActual === 'L' ? 'L' : pisoActual}`;
   actualizarMapaPreview();
 
-  // Render de alertas (esto cambiale a lo que ocupes)
+  const pisoDeHorario = (idGrupo) => {
+    const hf = horariosData.find(h => h.id_grupo === idGrupo);
+    if (hf) {
+      const salon = salonesData.find(s => s.id_salon === hf.id_salon);
+      return salon ? String(salon.piso) : null;
+    }
+    return null;
+  };
+
   const obtenerPisoDeAlerta = (alerta) => {
-    if (alerta.id_grupo) { // Ausencia
-      const hf = horario_fijo.find(h => h.id_grupo === alerta.id_grupo);
+    if (alerta.id_grupo) return pisoDeHorario(Number(alerta.id_grupo));
+    const idHf = alerta.id_horario_fijo || alerta.id_horario_fijo_detalle;
+    if (idHf) {
+      const hf = horariosData.find(h => h.id_horario_fijo === Number(idHf) || h.id_horario_fijo_detalle === Number(idHf));
       if (hf) {
-        const salon = salones.find(s => s.id_salon === hf.id_salon);
-        return salon?.piso;
-      }
-    } else if (alerta.id_horario_fijo) { 
-      const hf = horario_fijo.find(h => h.id_horario_fijo === alerta.id_horario_fijo);
-      if (hf) {
-        const salon = salones.find(s => s.id_salon === hf.id_salon);
-        return salon?.piso;
+        const salon = salonesData.find(s => s.id_salon === hf.id_salon);
+        return salon ? String(salon.piso) : null;
       }
     }
     return null;
   };
 
-  const crearTarjetaAlerta = (alerta, tipo) => { // Crea la tarjeta (cambialo para que se adapte)
+  const crearTarjetaAlerta = (alerta, tipo) => {
     const div = document.createElement('div');
     div.className = 'tarjeta-alerta';
-    
+
     if (tipo === 'ausencia') {
-      const profesor = usuarios.find(u => u.id_usuarios === alerta.id_profesor);
-      const grupo = grupos.find(g => g.id_grupo === alerta.id_grupo);
       div.innerHTML = `
         <div class="alerta-icono error">
           <span class="material-symbols-outlined md-20">person_off</span>
         </div>
         <div class="alerta-texto">
-          <p>Ausencia: ${profesor?.nombre || 'Profesor'}</p>
-          <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${alerta.hora}</p>
+          <p>Ausencia: ${alerta.nombre_profesor || 'Profesor'}</p>
+          <p>Grupo ${alerta.nombre_grupo || 'G'} • ${alerta.hora}</p>
           <p>Acción: ${alerta.accion_tomada}</p>
         </div>
       `;
     } else {
-      const hf = horario_fijo.find(h => h.id_horario_fijo === alerta.id_horario_fijo); // Busca el horario fijo relacionado para mostrar info contextual
-      const grupo = grupos.find(g => g.id_grupo === hf?.id_grupo);
       div.innerHTML = `
         <div class="alerta-icono advertencia">
           <span class="material-symbols-outlined md-20">warning</span>
         </div>
         <div class="alerta-texto">
-          <p>Cambio/Adelanto: ${alerta.motivo_cambio}</p>
-          <p>Grupo ${grupo?.nombre_grupo || 'G'} • ${alerta.hora_inicio}</p>
+          <p>Cambio/Adelanto: ${alerta.motivo || alerta.motivo_cambio}</p>
+          <p>${alerta.nombre_grupo ? `Grupo ${alerta.nombre_grupo}` : ''} • ${alerta.hora_inicio || alerta.hora_inicio_temp}</p>
         </div>
       `;
     }
     return div;
   };
 
+  const enPisoActual = (p) => {
+    if (p == null) return false;
+    const target = pisoActual === 'L' ? '0' : String(pisoActual);
+    return String(p) === target;
+  };
 
-// Llena el widget de alertas, filtrando por piso
   const renderizarAlertas = () => {
     const contenedor = document.getElementById('lista-reportes-dashboard');
     if (!contenedor) return;
 
     contenedor.innerHTML = '';
 
-    // Filtrar ausencias por piso
-    const ausenciasFiltradas = ausencias_profesor.filter(a => obtenerPisoDeAlerta(a) === pisoActual);
-    ausenciasFiltradas.forEach(ausencia => {
-      contenedor.appendChild(crearTarjetaAlerta(ausencia, 'ausencia'));
-    });
+    const ausenciasFiltradas = ausenciasData.filter(a => enPisoActual(obtenerPisoDeAlerta(a)));
+    ausenciasFiltradas.forEach(a => contenedor.appendChild(crearTarjetaAlerta(a, 'ausencia')));
 
-    // Filtrar cambios por piso
-    const cambiosFiltrados = horario_dinamico.filter(c => obtenerPisoDeAlerta(c) === pisoActual);
-    cambiosFiltrados.forEach(cambio => {
-      contenedor.appendChild(crearTarjetaAlerta(cambio, 'cambio'));
-    });
+    const cambiosFiltrados = dinamicaData.filter(d => enPisoActual(d.piso));
+    cambiosFiltrados.forEach(c => contenedor.appendChild(crearTarjetaAlerta(c, 'cambio')));
 
     if (contenedor.innerHTML === '') {
       contenedor.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px; font-size: 0.875rem;">No hay reportes en este piso.</p>';
@@ -710,23 +745,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const abrirModalAlertas = () => {
     if (!modalAlertas || !cuerpoModalAlertas) return;
-    
-    cuerpoModalAlertas.innerHTML = '';
-    
-    // En el historial mostramos todas las del piso seleccionado
-    const ausenciasFiltradas = ausencias_profesor.filter(a => obtenerPisoDeAlerta(a) === pisoActual);
-    const cambiosFiltrados = horario_dinamico.filter(c => obtenerPisoDeAlerta(c) === pisoActual);
 
-    // Agrupar por fecha para el diseño del historial
+    cuerpoModalAlertas.innerHTML = '';
+
+    const ausenciasFiltradas = ausenciasData.filter(a => enPisoActual(obtenerPisoDeAlerta(a)));
+    const cambiosFiltrados = dinamicaData.filter(d => enPisoActual(d.piso));
+
     const todasLasAlertas = [
       ...ausenciasFiltradas.map(a => ({ ...a, tipo: 'ausencia' })),
       ...cambiosFiltrados.map(c => ({ ...c, tipo: 'cambio' }))
-    ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    ].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
     const alertasPorFecha = {};
     todasLasAlertas.forEach(alerta => {
-      if (!alertasPorFecha[alerta.fecha]) alertasPorFecha[alerta.fecha] = [];
-      alertasPorFecha[alerta.fecha].push(alerta);
+      const f = alerta.fecha || '';
+      if (!alertasPorFecha[f]) alertasPorFecha[f] = [];
+      alertasPorFecha[f].push(alerta);
     });
 
     Object.keys(alertasPorFecha).forEach(fecha => {
@@ -798,11 +832,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Renderizado inicial
-  renderizarSalones();
-  renderizarAlertas();
-  renderizarEstadisticas();
-  
+  const inicializarDatos = async () => {
+    const fecha = hoyISO();
+
+    const safeFetch = async (url, opts, fallback) => {
+      try { return await fetchJson(url, opts); } catch (e) { console.warn(`Fallo ${url}:`, e?.message); return fallback; }
+    };
+
+    const [salonesRes, horariosRes, gruposRes, ausenciasRes, dinamicaRes] = await Promise.all([
+      safeFetch('/salones', {}, []),
+      safeFetch('/horarios', {}, { horarios: [] }),
+      safeFetch('/grupos', {}, { grupos: [] }),
+      safeFetch('/ausencias', { auth: true }, { ausencias: [] }),
+      safeFetch(`/horarios/tabla-dinamica?fecha=${encodeURIComponent(fecha)}`, { auth: true }, { tabla: [] })
+    ]);
+
+    salonesData = Array.isArray(salonesRes) ? salonesRes : (salonesRes?.salones || []);
+    horariosData = horariosRes?.horarios || [];
+    gruposData = gruposRes?.grupos || [];
+    ausenciasData = ausenciasRes?.ausencias || [];
+    dinamicaData = dinamicaRes?.tabla || [];
+
+    renderizarSalones();
+    renderizarAlertas();
+    renderizarEstadisticas();
+    actualizarMapaPreview();
+  };
+
+  inicializarDatos();
+
   setInterval(actualizarReloj, 1000);
   actualizarReloj();
 });

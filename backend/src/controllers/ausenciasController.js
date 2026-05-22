@@ -28,7 +28,7 @@ function normalizarTipo(raw) {
 function prefijarAccion(tipo, accion) {
   const a = String(accion || '').trim();
   if (!a) return `[${tipo}]`;
-  // Evitar duplicar prefijo si ya viene
+
   if (/^\[[a-z_]+\]/i.test(a)) return a;
   return `[${tipo}] ${a}`;
 }
@@ -37,13 +37,10 @@ function prefijarAccion(tipo, accion) {
 export const registrarAusencia = async (req, res) => {
   try {
     const { fecha, hora, id_profesor, id_grupo, accion_tomada, tipo } = req.body || {};
-    // Now we store the selector value directly in accion_tomada.
     if (!fecha || !hora || !id_grupo || !accion_tomada) {
       return res.status(400).json({ error: "Faltan campos requeridos: fecha, hora, id_grupo, accion_tomada" });
     }
 
-    // Por compatibilidad con la BD actual: id_profesor sigue siendo requerido en la tabla.
-    // En incidencias no-ausencia el front manda el titular como referencia.
     if (!id_profesor) {
       return res.status(400).json({ error: "Falta id_profesor (requerido por el esquema actual)" });
     }
@@ -53,7 +50,6 @@ export const registrarAusencia = async (req, res) => {
     const [gRows] = await db.query("SELECT id_grupo FROM Grupos WHERE id_grupo = ? LIMIT 1", [id_grupo]);
     if (!gRows || gRows.length === 0) return res.status(400).json({ error: "Grupo no encontrado" });
 
-    // Store selector value directly in accion_tomada (no tipo_incidencia column required)
     await db.query(
       `INSERT INTO Incidencias (fecha, hora, id_profesor, id_grupo, accion_tomada)
        VALUES (?, ?, ?, ?, ?)`,
@@ -84,7 +80,6 @@ export const listarAusencias = async (req, res) => {
     if (fecha) { sql += " AND a.fecha = ?"; params.push(fecha); }
     if (id_profesor) { sql += " AND a.id_profesor = ?"; params.push(Number(id_profesor)); }
     if (id_grupo) { sql += " AND a.id_grupo = ?"; params.push(Number(id_grupo)); }
-        // Filtering by tipo is done by comparing the selector value stored in accion_tomada
         if (tipo) { sql += " AND a.accion_tomada = ?"; params.push(String(tipo)); }
 
     sql += " ORDER BY a.fecha DESC, a.hora DESC";

@@ -102,7 +102,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     if (lower.startsWith('jue')) return 'Jueves';
     if (lower.startsWith('vie')) return 'Viernes';
 
-    // Fallback: capitalizar primera letra
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
@@ -161,7 +160,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const salonesRows = safeRows(salonesData);
       salones = salonesRows.map((s) => ({
         ...s,
-        // compat front viejo
         numero_salon: s.numero_salon || s.nombre_salon
       }));
 
@@ -302,7 +300,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         .map((r) => ({
           ...r,
           id_horario_dinamico: Number(r.id_horario_dinamico),
-          // Forzar a la fecha solicitada para evitar desfaces (DATE -> ISO con TZ)
           fecha: fechaDinamica,
           dia: normalizarDia(r.dia || diaDesdeFecha(fechaDinamica) || ''),
           hora_inicio: hhmm(r.hora_inicio_temp ?? r.hora_inicio),
@@ -316,7 +313,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     } catch (err) {
       console.error('Error cargando dinámica:', err);
       ultimoErrorDinamica = err;
-      // Mantener el último estado conocido (incluye UI optimista) para no “borrar” incidencias/colores
     }
   };
   
@@ -937,7 +933,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const hi = timeToMinutes(h?.hora_inicio);
       const hfRaw = timeToMinutes(h?.hora_fin);
       if (hi === null || hfRaw === null) return false;
-      // Si está en la hora exacta (09:00), interpretarlo como 08:50 (regla -10 min)
       const hf = hfRaw % 60 === 0 && hfRaw > hi ? hfRaw - 10 : hfRaw;
       return tMin >= hi && tMin < hf;
     };
@@ -1943,7 +1938,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     });
   };
 
-  // Modal para editar horario (COMPLETO - todos los campos editables)
   const modalEditarHorario = document.createElement('div');
   modalEditarHorario.id = 'modal-editar-horario';
   modalEditarHorario.className = 'modal-overlay';
@@ -2251,7 +2245,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (editarSalonBtn) {
     editarSalonBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      // Si ya hay un salón elegido, solo abrir si el clic fue en "Cambiar salón"
       if (editarSalonBtn.classList.contains('salon-elegido') && !e.target.closest('.salon-elegido-cambiar')) return;
       modalEditarSalon.classList.add('activo');
 
@@ -2689,8 +2682,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   // Refrescar ocupación cuando cambien día/horas
   const onRangoChange = () => {
-    // Mantener el mapa al día incluso si el modal no está abierto,
-    // para que cuando se abra ya tenga ocupación correcta.
     refrescarDisponibilidadMapa().catch(() => {});
   };
   regDiaEl?.addEventListener('change', onRangoChange);
@@ -2974,7 +2965,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       e.preventDefault();
       const tipoRaw = incTipoEl?.value || '';
       const tipo = normalizarTipoIncidencia(tipoRaw);
-      // Usamos el selector como accion_tomada directamente
       const contexto = tipo;
 
       const horaRegistro = (tipo === 'ausencia_profesor')
@@ -3016,7 +3006,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           }
         });
 
-        // Optimista: reflejar de inmediato sin depender del GET
         const nuevaAusencia = {
           fecha: fechaDinamica,
           hora: hhmm(horaRegistro),
@@ -3029,13 +3018,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           Number(a.id_profesor) === nuevaAusencia.id_profesor &&
           Number(a.id_grupo) === nuevaAusencia.id_grupo &&
           hhmm(a.hora) === nuevaAusencia.hora &&
-          // Compare by accion_tomada (selector value stored there)
+
           normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo ?? parseTipoDesdeAccion(a.accion_tomada) ?? a.accion_tomada) === normalizarTipoIncidencia(nuevaAusencia.accion_tomada)
         ));
         ausencias_profesor.push(nuevaAusencia);
         ultimoErrorDinamica = null;
 
-        // Asegurar que el usuario vea el efecto (alertas + rojo) en dinámica
         if (modoVista !== 'dinamica') {
           modoVista = 'dinamica';
           const selectorModo = document.getElementById('selector-modo-vista');
