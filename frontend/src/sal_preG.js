@@ -78,10 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const fechaParaTablaDinamica = () => {
     const d = new Date();
-    const dow = d.getDay();
-    // 0=Domingo,6=Sábado -> backend rechaza fin de semana
-    if (dow === 6) d.setDate(d.getDate() - 1);
-    if (dow === 0) d.setDate(d.getDate() - 2);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');

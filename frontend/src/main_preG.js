@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(obj.piso) === target;
   };
 
-  const hoyISO = () => new Date().toISOString().split('T')[0];
+  const hoyISO = () => new Date().toLocaleDateString('sv-SE');
 
   const NS = 'http://www.w3.org/2000/svg';
 

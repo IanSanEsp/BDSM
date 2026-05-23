@@ -1,15 +1,15 @@
 import { db } from "../config/db.js";
 
-const DIAS = new Set(["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"]);
+const DIAS = new Set(["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]);
 
 const DIAS_POR_NUMERO = [
-  null,
+  "Domingo",
   "Lunes",
   "Martes",
   "Miercoles",
   "Jueves",
   "Viernes",
-  null
+  "Sabado"
 ];
 
 const _columnCache = new Map();

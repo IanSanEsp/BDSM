@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   const stripTipoPrefix = (accion) => String(accion || '').replace(/^\[[a-z_]+\]\s*/i, '').trim();
 
-  const fechaHoyISO = () => new Date().toISOString().split('T')[0];
+  const fechaHoyISO = () => new Date().toLocaleDateString('sv-SE');
 
   const fechaYYYYMMDD = (v, fallback = '') => {
     if (v === null || v === undefined || v === '') return fallback;
