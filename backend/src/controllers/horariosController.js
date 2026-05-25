@@ -330,7 +330,7 @@ export const listarHorarios = async (req, res) => {
     if (materia) { sql += " AND m.nombre_materia LIKE ?"; params.push(`%${materia}%`); }
     if (id_salon) { sql += " AND hf.id_salon = ?"; params.push(Number(id_salon)); }
 
-    sql += " ORDER BY FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio";
+    sql += " ORDER BY FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio";
     const [rows] = await db.query(sql, params);
     res.json({ horarios: rows });
   } catch (err) {
@@ -834,7 +834,7 @@ export const tablaDinamicaPorFecha = async (req, res) => {
       params.push(Number(piso));
     }
 
-    sql += " ORDER BY s.piso, s.nombre_salon, FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio";
+    sql += " ORDER BY s.piso, s.nombre_salon, FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio";
     const [rows] = await db.query(sql, params);
     return res.json({ tabla: rows });
   } catch (err) {
