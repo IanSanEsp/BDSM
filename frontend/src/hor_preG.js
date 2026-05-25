@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   const stripTipoPrefix = (accion) => String(accion || '').replace(/^\[[a-z_]+\]\s*/i, '').trim();
 
-  const fechaHoyISO = () => new Date().toLocaleDateString('sv-SE');
+  const fechaHoyISO = () => new Date().toISOString().split('T')[0];
 
   const fechaYYYYMMDD = (v, fallback = '') => {
     if (v === null || v === undefined || v === '') return fallback;
@@ -101,8 +101,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     if (lower.startsWith('mié') || lower.startsWith('mie')) return 'Miercoles';
     if (lower.startsWith('jue')) return 'Jueves';
     if (lower.startsWith('vie')) return 'Viernes';
-    if (lower.startsWith('sab')) return 'Sabado';
 
+    // Fallback: capitalizar primera letra
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
@@ -161,6 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const salonesRows = safeRows(salonesData);
       salones = salonesRows.map((s) => ({
         ...s,
+        // compat front viejo
         numero_salon: s.numero_salon || s.nombre_salon
       }));
 
@@ -301,6 +302,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         .map((r) => ({
           ...r,
           id_horario_dinamico: Number(r.id_horario_dinamico),
+          // Forzar a la fecha solicitada para evitar desfaces (DATE -> ISO con TZ)
           fecha: fechaDinamica,
           dia: normalizarDia(r.dia || diaDesdeFecha(fechaDinamica) || ''),
           hora_inicio: hhmm(r.hora_inicio_temp ?? r.hora_inicio),
@@ -314,6 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     } catch (err) {
       console.error('Error cargando dinámica:', err);
       ultimoErrorDinamica = err;
+      // Mantener el último estado conocido (incluye UI optimista) para no “borrar” incidencias/colores
     }
   };
   
@@ -354,13 +357,13 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     const d = new Date();
     const dow = d.getDay();
     const map = [
-      'Sabado',
+      'Viernes',
       'Lunes',
       'Martes',
       'Miercoles',
       'Jueves',
       'Viernes',
-      'Sabado'
+      'Viernes'
     ];
     return map[dow] || 'Lunes';
   };
@@ -479,25 +482,46 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           } else {
             // Si no hay dinamico, buscar fijo
             horario = horario_fijo.find(h => h.id_grupo === grupo.id_grupo && h.dia === diaSeleccionadoTabla && h.hora_inicio === hora);
-            
-            // Si la clase fija existe pero tiene adelantos parciales, ajustar su hora_fin
+
+            // Si la clase fija existe y tiene adelantos, debe conservarse la parte no adelantada.
+            // Regla: si se adelantó 1 de 2 horas, queda 1 hora original; si se adelantó toda, ya no se muestra.
             if (horario) {
-              const dinamicosCubrentes = horario_dinamico.filter(
+              const dinamicosMismaClase = horario_dinamico.filter(
                 (d) => Number(d.id_horario_fijo_detalle) === Number(horario.id_horario_fijo_detalle)
               );
-              if (dinamicosCubrentes.length > 0) {
-                const durOriginal = timeToMinutes(horario.hora_fin) - timeToMinutes(horario.hora_inicio);
-                const periodosOriginal = Math.max(1, Math.ceil(durOriginal / 60));
-                const minsAvanzados = dinamicosCubrentes.reduce((total, d) => {
-                  return total + (timeToMinutes(d.hora_fin) - timeToMinutes(d.hora_inicio));
-                }, 0);
-                const periodosAvanzados = Math.ceil(minsAvanzados / 60);
-                if (periodosAvanzados >= periodosOriginal) {
-                  horario = null;
-                } else {
-                  const periodosRestantes = periodosOriginal - periodosAvanzados;
-                  const newEnd = timeToMinutes(horario.hora_inicio) + periodosRestantes * 50;
-                  horario = { ...horario, hora_fin: minutesToHHMM(newEnd) };
+              const adelantosMismaClase = dinamicosMismaClase.filter((d) =>
+                String(d?.motivo || d?.motivo_cambio || '').toLowerCase().includes('adelanto')
+              );
+
+              const bloquesAdelantados = adelantosMismaClase.reduce((acc, d) => {
+                const dHi = timeToMinutes(d.hora_inicio);
+                const dHfRaw = timeToMinutes(d.hora_fin);
+                if (dHi === null || dHfRaw === null) return acc + 1;
+                const dHfBoundary = (dHfRaw % 60 === 0 && dHfRaw > dHi)
+                  ? dHfRaw
+                  : (Math.floor(dHfRaw / 60) * 60 + 60);
+                const bloques = Math.max(1, Math.ceil((dHfBoundary - dHi) / 60));
+                return acc + bloques;
+              }, 0);
+              if (bloquesAdelantados > 0) {
+                const hi = timeToMinutes(horario.hora_inicio);
+                const hfRaw = timeToMinutes(horario.hora_fin);
+                if (hi !== null && hfRaw !== null) {
+                  // Si termina en una hora exacta, usar esa; si no, redondear hacia arriba al siguiente bloque.
+                  const hfBoundary = (hfRaw % 60 === 0 && hfRaw > hi)
+                    ? hfRaw
+                    : (Math.floor(hfRaw / 60) * 60 + 60);
+                  const bloquesSesion = Math.max(1, Math.ceil((hfBoundary - hi) / 60));
+                  const bloquesRestantes = bloquesSesion - bloquesAdelantados;
+
+                  if (bloquesRestantes <= 0) {
+                    // Se adelantó toda la clase
+                    horario = null;
+                  } else {
+                    // Acortar la clase a la parte no adelantada (prefijo)
+                    const nuevoFin = hi + bloquesRestantes * 60;
+                    horario = { ...horario, hora_fin: minutesToHHMM(nuevoFin) };
+                  }
                 }
               }
             }
@@ -517,11 +541,14 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           const salon = salones.find(s => s.id_salon === horario.id_salon);
           const esAusenteTitular = ausenteTitularEnHora(horario);
 
-          const indexInicio = franjasHorarias.indexOf(horario.hora_inicio);
-          const indexFin = franjasHorarias.indexOf(horario.hora_fin.split(':')[0] + ':00');
-          const hInicio = parseInt(horario.hora_inicio.split(':')[0]);
-          const hFin = parseInt(horario.hora_fin.split(':')[0]);
-          const numBloques = (hFin - hInicio) + 1; // magia para calcular bloques (el +1 es por si tiene dos bloques (editar ya luego))
+          // Tamaño del bloque (colSpan) según duración real.
+          // Cada columna representa 1 hora: [HH:00, HH+1:00). `hora_fin` es límite superior (exclusivo).
+          let numBloques = 1;
+          const inicioMin = timeToMinutes(horario.hora_inicio);
+          const finMin = timeToMinutes(horario.hora_fin);
+          if (inicioMin !== null && finMin !== null && finMin > inicioMin) {
+            numBloques = Math.max(1, Math.ceil((finMin - inicioMin) / 60));
+          }
 
           if (numBloques > 1) {
             tdHora.colSpan = numBloques;
@@ -768,7 +795,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
           await cargarDatosDinamica(fechaHoyISO());
           const dia = diaDesdeFecha(fechaDinamica);
-          if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
+          if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
             diaSeleccionadoTabla = dia;
           }
           renderizarAdelantos();
@@ -810,7 +837,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
       await cargarDatosDinamica(fechaHoyISO());
       const dia = diaDesdeFecha(fechaDinamica);
-      if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
+      if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
         diaSeleccionadoTabla = dia;
       }
       renderizarAdelantos();
@@ -867,7 +894,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     if (modoVista !== 'dinamica') return;
 
     const dia = diaDesdeFecha(fechaDinamica);
-    if (!dia || !['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
+    if (!dia || !['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
       const empty = document.createElement('div');
       empty.className = 'tarjeta-adelanto';
       empty.innerHTML = `
@@ -934,6 +961,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const hi = timeToMinutes(h?.hora_inicio);
       const hfRaw = timeToMinutes(h?.hora_fin);
       if (hi === null || hfRaw === null) return false;
+      // Si está en la hora exacta (09:00), interpretarlo como 08:50 (regla -10 min)
       const hf = hfRaw % 60 === 0 && hfRaw > hi ? hfRaw - 10 : hfRaw;
       return tMin >= hi && tMin < hf;
     };
@@ -949,19 +977,16 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       });
     };
 
-    const staffLibreEnExcluyendo = (ids, horaInicioHHMM, excludeSlotIds = [], groupId = null) => {
+    const staffLibreEnExcluyendo = (ids, horaInicioHHMM, excludeSlotIds = []) => {
       const tMin = timeToMinutes(horaInicioHHMM);
       if (!ids || ids.length === 0 || tMin === null) return false;
       const excludeSet = new Set(excludeSlotIds.map(id => Number(id)));
       return !horario_fijo.some((h) => {
         if (h.dia !== dia) return false;
-        if (excludeSet.has(Number(h.id_horario_fijo_detalle))) return false;
+        if (excludeSet.has(Number(h.id_horario_fijo_detalle))) return false; // Excluir slots de la sesión actual
         if (!ocupaEnMinuto(h, tMin)) return false;
         const hStaff = staffIds(h);
-        if (!hStaff.some((pid) => ids.includes(pid))) return false;
-        // Verificar si el profesor tiene ausencia registrada en esta hora exacta
-        if (groupId && ids.some((pid) => ausenciasExpandidas.get(groupId)?.get(tMin)?.has(pid))) return false;
-        return true;
+        return hStaff.some((pid) => ids.includes(pid));
       });
     };
 
@@ -976,40 +1001,17 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     const ausenciasDia = ausencias_profesor
       .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
       .filter((a) => normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor');
-    // group -> timeMin -> Set(id_profesor) — ausencias originales
+    // group -> timeMin -> Set(id_profesor)
     const ausenciasPorGrupoTiempo = new Map();
-    // group -> timeMin -> Set(id_profesor) — expandidas a todas las horas de la clase afectada
-    const ausenciasExpandidas = new Map();
     for (const a of ausenciasDia) {
       const gid = Number(a.id_grupo);
       const mins = timeToMinutes(a.hora);
       const pid = Number(a.id_profesor);
       if (!Number.isFinite(gid) || mins === null || !Number.isFinite(pid)) continue;
-
-      // Original
       if (!ausenciasPorGrupoTiempo.has(gid)) ausenciasPorGrupoTiempo.set(gid, new Map());
-      const mapOri = ausenciasPorGrupoTiempo.get(gid);
-      if (!mapOri.has(mins)) mapOri.set(mins, new Set());
-      mapOri.get(mins).add(pid);
-
-      // Expandir a todas las horas que cubre la clase afectada por la ausencia
-      const slotBase = horario_fijo.find(h =>
-        h.dia === dia &&
-        Number(h.id_grupo) === gid &&
-        Number(h.id_profesor) === pid &&
-        timeToMinutes(h.hora_inicio) === mins
-      );
-      if (!slotBase) continue;
-      const hi = timeToMinutes(slotBase.hora_inicio);
-      const hfRaw = timeToMinutes(slotBase.hora_fin);
-      if (hi === null || hfRaw === null) continue;
-      const hf = hfRaw % 60 === 0 && hfRaw > hi ? hfRaw - 10 : hfRaw;
-      for (let t = hi; t < hf; t += 60) {
-        if (!ausenciasExpandidas.has(gid)) ausenciasExpandidas.set(gid, new Map());
-        const map = ausenciasExpandidas.get(gid);
-        if (!map.has(t)) map.set(t, new Set());
-        map.get(t).add(pid);
-      }
+      const map = ausenciasPorGrupoTiempo.get(gid);
+      if (!map.has(mins)) map.set(mins, new Set());
+      map.get(mins).add(pid);
     }
 
     const horaLibrePorIncidencia = (idGrupo, startMins) => {
@@ -1052,42 +1054,43 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         return Math.max(1, hf - hi);
       })();
 
-      const horasSesion = Math.ceil(durSlot / 60);
+      const sesionLen = ultimaSesion.slots.length;
       const titularIdSesion = Number(ultimaSesion.id_profesor);
       if (!Number.isFinite(titularIdSesion)) continue;
 
       const ausenciaStarts = [...timeMap.keys()].sort((a, b) => a - b);
       for (const ausenciaStartMins of ausenciaStarts) {
+        // Debe adelantar: la hora libre debe ser antes del inicio de la sesión final
         if (ausenciaStartMins >= sesionStartMins) continue;
 
+        // Si en esa hora NO está libre por incidencia (incluye aux si aplica), no cuenta.
         if (!horaLibrePorIncidencia(idGrupo, ausenciaStartMins)) continue;
 
-        // Calcular cuántas horas cubre la clase que tuvo la ausencia
-        const claseAusencia = claseGrupoEnHora(idGrupo, minutesToHHMM(ausenciaStartMins));
-        const durAusencia = claseAusencia
-          ? (timeToMinutes(claseAusencia.hora_fin) ?? 0) - (timeToMinutes(claseAusencia.hora_inicio) ?? 0)
-          : 50;
-        const horasAusencia = Math.ceil(Math.max(1, durAusencia) / 60);
-        const maxIteraciones = Math.min(horasSesion, horasAusencia);
-
+        // Calcular cuántas horas consecutivas están libres (basadas en el staff disponible)
+        // Primera hora debe tener ausencia registrada; siguientes solo necesitan staff disponible
+        // Excluir de check de disponibilidad los slots de la sesión actual (que se van a adelantar)
         const excludeSlotIds = ultimaSesion.slots.map(s => Number(s.id_horario_fijo_detalle));
         let maxConsec = 0;
-        for (let i = 0; i < maxIteraciones; i++) {
+        for (let i = 0; i < sesionLen; i++) {
           const t = ausenciaStartMins + i * 60;
+          // Primera hora: debe haber ausencia; siguientes: solo necesitan staff libre
           if (i === 0) {
             if (!horaLibrePorIncidencia(idGrupo, t)) break;
           }
-          if (!staffLibreEnExcluyendo([titularIdSesion], minutesToHHMM(t), excludeSlotIds, Number(idGrupo))) break;
+          if (!staffLibreEnExcluyendo([titularIdSesion], minutesToHHMM(t), excludeSlotIds)) break;
           maxConsec++;
         }
         if (maxConsec <= 0) continue;
 
         const grupo = grupos.find((g) => Number(g.id_grupo) === Number(idGrupo));
         const materia = materias.find((m) => Number(m.id_materia) === Number(slotFinal.id_materia));
+        const durBloque = 50;
 
-        const maxParcial = Math.min(maxConsec, horasSesion);
+        // Calcular el máximo de bloques que se pueden adelantar (limitado por horas libres y duración de la sesión)
+        // Se crea UNA sola propuesta con el máximo, no múltiples propuestas
+        const maxParcial = Math.min(maxConsec, sesionLen);
         if (maxParcial > 0) {
-          const slotsOrigen = ultimaSesion.slots.slice(Math.max(0, ultimaSesion.slots.length - maxParcial));
+          const slotsOrigen = ultimaSesion.slots.slice(sesionLen - maxParcial);
           const key = `${slotsOrigen.map((s) => s.id_horario_fijo_detalle).join('-')}-${ausenciaStartMins}`;
           if (!visto.has(key)) {
             visto.add(key);
@@ -1102,8 +1105,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
               materia_nombre: materia?.nombre_materia || 'Materia',
               slots_origen: slotsOrigen,
               destino_start_mins: ausenciaStartMins,
-              bloques_a_mover: maxConsec,
-              dur_mins: 50,
+              bloques_a_mover: maxParcial,
+              dur_mins: durBloque,
               motivo: 'Adelanto por incidencia'
             });
           }
@@ -1168,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           : '-';
 
         const destinoInicio = minutesToHHMM(p.destino_start_mins);
-        const destinoFin = minutesToHHMM(p.destino_start_mins + (Math.max(1, p.bloques_a_mover) - 1) * 60 + p.dur_mins);
+        const destinoFin = minutesToHHMM(p.destino_start_mins + (Math.max(1, slots.length) - 1) * 60 + p.dur_mins);
 
         const div = document.createElement('div');
         div.className = 'tarjeta-adelanto';
@@ -1206,8 +1209,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     salonModoSeleccion = 'adelanto';
 
     const destinoInicio = minutesToHHMM(propuesta.destino_start_mins);
-    const bloques = propuesta.bloques_a_mover || 1;
-    const destinoFin = minutesToHHMM(propuesta.destino_start_mins + (Math.max(1, bloques) - 1) * 60 + propuesta.dur_mins);
+    const slotsCount = Array.isArray(propuesta.slots_origen) ? propuesta.slots_origen.length : 1;
+    const destinoFin = minutesToHHMM(propuesta.destino_start_mins + (Math.max(1, slotsCount) - 1) * 60 + propuesta.dur_mins);
     abrirModalSalonConContexto({
       fecha: fechaDinamica,
       dia: propuesta.dia,
@@ -1258,27 +1261,15 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
       btnConfirmarAdelanto.disabled = true;
       try {
-        // Agrupar bloques consecutivos por slot para evitar llamadas duplicadas
-        const slotGroups = [];
-        let currentGroup = null;
-        for (let i = 0; i < adelantoPendiente.bloques_a_mover; i++) {
-          const slot = adelantoPendiente.slots_origen[Math.min(i, adelantoPendiente.slots_origen.length - 1)];
+        for (let i = 0; i < adelantoPendiente.slots_origen.length; i++) {
+          const slot = adelantoPendiente.slots_origen[i];
+          const hi = minutesToHHMM(destinoStart + i * 60);
+          const hf = minutesToHHMM(destinoStart + i * 60 + dur);
+
           const idDetalle = Number(slot.id_horario_fijo_detalle);
           if (!idDetalle) continue;
-          if (!currentGroup || currentGroup.idDetalle !== idDetalle) {
-            currentGroup = { idDetalle, slot, startIdx: i, count: 1 };
-            slotGroups.push(currentGroup);
-          } else {
-            currentGroup.count++;
-          }
-        }
 
-        for (const group of slotGroups) {
-          const hi = minutesToHHMM(destinoStart + group.startIdx * 60);
-          const durTotal = (group.count - 1) * 60 + dur;
-          const hf = minutesToHHMM(destinoStart + group.startIdx * 60 + durTotal);
-
-          await fetchJson(`/horarios/${group.idDetalle}/adelantar-clase`, {
+          await fetchJson(`/horarios/${idDetalle}/adelantar-clase`, {
             method: 'POST',
             auth: true,
             body: {
@@ -1939,6 +1930,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     });
   };
 
+  // Modal para editar horario (COMPLETO - todos los campos editables)
   const modalEditarHorario = document.createElement('div');
   modalEditarHorario.id = 'modal-editar-horario';
   modalEditarHorario.className = 'modal-overlay';
@@ -1986,7 +1978,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
               <option value="Miercoles">Miercoles</option>
               <option value="Jueves">Jueves</option>
               <option value="Viernes">Viernes</option>
-              <option value="Sabado">Sabado</option>
             </select>
           </div>
           <div class="fila-formulario">
@@ -2247,6 +2238,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (editarSalonBtn) {
     editarSalonBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Si ya hay un salón elegido, solo abrir si el clic fue en "Cambiar salón"
       if (editarSalonBtn.classList.contains('salon-elegido') && !e.target.closest('.salon-elegido-cambiar')) return;
       modalEditarSalon.classList.add('activo');
 
@@ -2684,6 +2676,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   // Refrescar ocupación cuando cambien día/horas
   const onRangoChange = () => {
+    // Mantener el mapa al día incluso si el modal no está abierto,
+    // para que cuando se abra ya tenga ocupación correcta.
     refrescarDisponibilidadMapa().catch(() => {});
   };
   regDiaEl?.addEventListener('change', onRangoChange);
@@ -2967,6 +2961,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       e.preventDefault();
       const tipoRaw = incTipoEl?.value || '';
       const tipo = normalizarTipoIncidencia(tipoRaw);
+      // Usamos el selector como accion_tomada directamente
       const contexto = tipo;
 
       const horaRegistro = (tipo === 'ausencia_profesor')
@@ -3008,6 +3003,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           }
         });
 
+        // Optimista: reflejar de inmediato sin depender del GET
         const nuevaAusencia = {
           fecha: fechaDinamica,
           hora: hhmm(horaRegistro),
@@ -3020,12 +3016,13 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           Number(a.id_profesor) === nuevaAusencia.id_profesor &&
           Number(a.id_grupo) === nuevaAusencia.id_grupo &&
           hhmm(a.hora) === nuevaAusencia.hora &&
-
+          // Compare by accion_tomada (selector value stored there)
           normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo ?? parseTipoDesdeAccion(a.accion_tomada) ?? a.accion_tomada) === normalizarTipoIncidencia(nuevaAusencia.accion_tomada)
         ));
         ausencias_profesor.push(nuevaAusencia);
         ultimoErrorDinamica = null;
 
+        // Asegurar que el usuario vea el efecto (alertas + rojo) en dinámica
         if (modoVista !== 'dinamica') {
           modoVista = 'dinamica';
           const selectorModo = document.getElementById('selector-modo-vista');
@@ -3109,8 +3106,3 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     });
   });
 });
-
-
-
-
-//the impostor is sus
