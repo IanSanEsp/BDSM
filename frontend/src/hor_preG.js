@@ -120,13 +120,21 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       if (token) headers.Authorization = `Bearer ${token}`;
     }
 
-    const url = /^https?:\/\//i.test(String(pathOrUrl))
+    let url = /^https?:\/\//i.test(String(pathOrUrl))
       ? String(pathOrUrl)
       : `${apiBase}${String(pathOrUrl).startsWith('/') ? '' : '/'}${String(pathOrUrl)}`;
+
+    // Evitar caché (Vercel/CDN/navegador) para endpoints dinámicos.
+    const httpMethod = String(method || 'GET').toUpperCase();
+    if (httpMethod === 'GET') {
+      const sep = url.includes('?') ? '&' : '?';
+      url = `${url}${sep}_=${Date.now()}`;
+    }
 
     const res = await fetch(url, {
       method,
       headers,
+      cache: 'no-store',
       body: body === undefined ? undefined : JSON.stringify(body)
     });
 
