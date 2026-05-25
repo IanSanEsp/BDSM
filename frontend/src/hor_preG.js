@@ -1318,6 +1318,24 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
     if (modoVista !== 'dinamica') return;
 
+    if (ultimoErrorDinamica) {
+      const status = ultimoErrorDinamica?.status;
+      const msg = ultimoErrorDinamica?.message || 'No se pudieron cargar datos dinámicos.';
+      const div = document.createElement('div');
+      div.className = 'tarjeta-alerta';
+      const esAuth = status === 401 || status === 403;
+      div.innerHTML = `
+        <div class="alerta-icono error">
+          <span class="material-symbols-outlined md-20">error</span>
+        </div>
+        <div class="alerta-texto">
+          <p>${esAuth ? 'Sin sesión / permisos' : 'Error cargando dinámica'}</p>
+          <p>${esAuth ? 'Inicia sesión como prefecto/admin para ver incidencias.' : msg}</p>
+        </div>
+      `;
+      contenedor.appendChild(div);
+    }
+
     const alerts = [];
     for (const a of ausencias_profesor) {
       if ((a.fecha || fechaDinamica) !== fechaDinamica) continue;
@@ -1347,25 +1365,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
 
     alerts.sort((a, b) => (timeToMinutes(b.hora) ?? 0) - (timeToMinutes(a.hora) ?? 0));
-
-    if (alerts.length === 0 && ultimoErrorDinamica) {
-      const status = ultimoErrorDinamica?.status;
-      const msg = ultimoErrorDinamica?.message || 'No se pudieron cargar las alertas dinámicas.';
-      const div = document.createElement('div');
-      div.className = 'tarjeta-alerta';
-      const esAuth = status === 401 || status === 403;
-      div.innerHTML = `
-        <div class="alerta-icono error">
-          <span class="material-symbols-outlined md-20">error</span>
-        </div>
-        <div class="alerta-texto">
-          <p>${esAuth ? 'Sin sesión / permisos' : 'Error cargando dinámica'}</p>
-          <p>${esAuth ? 'Inicia sesión como prefecto/admin para ver incidencias.' : msg}</p>
-        </div>
-      `;
-      contenedor.appendChild(div);
-      return;
-    }
 
     if (alerts.length === 0) {
       const empty = document.createElement('div');

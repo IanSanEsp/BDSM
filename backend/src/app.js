@@ -37,6 +37,16 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.has(origin)) return callback(null, true);
+
+    // Permitir previews/staging de Vercel (subdominios variables)
+    try {
+      const u = new URL(origin);
+      const host = String(u.hostname || '').toLowerCase();
+      if (host.endsWith('.vercel.app')) return callback(null, true);
+    } catch {
+      // ignore
+    }
+
     return callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE"],
