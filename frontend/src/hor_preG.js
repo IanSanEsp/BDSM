@@ -120,21 +120,13 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       if (token) headers.Authorization = `Bearer ${token}`;
     }
 
-    let url = /^https?:\/\//i.test(String(pathOrUrl))
+    const url = /^https?:\/\//i.test(String(pathOrUrl))
       ? String(pathOrUrl)
       : `${apiBase}${String(pathOrUrl).startsWith('/') ? '' : '/'}${String(pathOrUrl)}`;
-
-    // Evitar caché (Vercel/CDN/navegador) para endpoints dinámicos.
-    const httpMethod = String(method || 'GET').toUpperCase();
-    if (httpMethod === 'GET') {
-      const sep = url.includes('?') ? '&' : '?';
-      url = `${url}${sep}_=${Date.now()}`;
-    }
 
     const res = await fetch(url, {
       method,
       headers,
-      cache: 'no-store',
       body: body === undefined ? undefined : JSON.stringify(body)
     });
 
@@ -918,6 +910,11 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
 
     const agruparSesiones = (slotsOrdenados) => {
+      const normId = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        return n;
+      };
       const sesiones = [];
       let actual = null;
       for (const slot of slotsOrdenados) {
@@ -925,10 +922,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (!actual) {
           actual = {
             slots: [slot],
-            id_profesor: slot.id_profesor,
-            id_profesor_aux: slot.id_profesor_aux ?? slot.id_auxiliar ?? null,
-            id_materia: slot.id_materia,
-            id_grupo: slot.id_grupo
+            id_profesor: normId(slot.id_profesor),
+            id_profesor_aux: normId(slot.id_profesor_aux ?? slot.id_auxiliar),
+            id_materia: normId(slot.id_materia),
+            id_grupo: normId(slot.id_grupo)
           };
           continue;
         }
@@ -936,10 +933,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         const prevHi = timeToMinutes(prev.hora_inicio);
         const esConsecutivo = hi !== null && prevHi !== null && hi === prevHi + 60;
         const mismoBloque =
-          Number(slot.id_profesor) === Number(actual.id_profesor) &&
-          Number(slot.id_profesor_aux ?? slot.id_auxiliar ?? null) === Number(actual.id_profesor_aux ?? null) &&
-          Number(slot.id_materia) === Number(actual.id_materia) &&
-          Number(slot.id_grupo) === Number(actual.id_grupo);
+          normId(slot.id_profesor) === actual.id_profesor &&
+          normId(slot.id_profesor_aux ?? slot.id_auxiliar) === actual.id_profesor_aux &&
+          normId(slot.id_materia) === actual.id_materia &&
+          normId(slot.id_grupo) === actual.id_grupo;
 
         if (esConsecutivo && mismoBloque) {
           actual.slots.push(slot);
@@ -947,10 +944,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           sesiones.push(actual);
           actual = {
             slots: [slot],
-            id_profesor: slot.id_profesor,
-            id_profesor_aux: slot.id_profesor_aux ?? slot.id_auxiliar ?? null,
-            id_materia: slot.id_materia,
-            id_grupo: slot.id_grupo
+            id_profesor: normId(slot.id_profesor),
+            id_profesor_aux: normId(slot.id_profesor_aux ?? slot.id_auxiliar),
+            id_materia: normId(slot.id_materia),
+            id_grupo: normId(slot.id_grupo)
           };
         }
       }
@@ -958,10 +955,58 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       return sesiones;
     };
 
+    const expandirSlotsPorHora = (slots) => {
+      const out = [];
+      for (const slot of slots) {
+        const hi = timeToMinutes(slot.hora_inicio);
+        const hfRaw = timeToMinutes(slot.hora_fin);
+        if (hi === null || hfRaw === null || hfRaw <= hi) {
+          out.push(slot);
+          continue;
+        }
+
+        const hfBoundary = (hfRaw % 60 === 0 && hfRaw > hi)
+          ? hfRaw
+          : (Math.floor(hfRaw / 60) * 60 + 60);
+        const bloques = Math.max(1, Math.ceil((hfBoundary - hi) / 60));
+
+        if (bloques <= 1) {
+          out.push(slot);
+          continue;
+        }
+
+        const durBase = Math.min(50, Math.max(1, hfRaw - hi));
+        for (let i = 0; i < bloques; i++) {
+          const ini = hi + i * 60;
+          const fin = ini + durBase;
+          out.push({
+            ...slot,
+            hora_inicio: minutesToHHMM(ini),
+            hora_fin: minutesToHHMM(fin)
+          });
+        }
+      }
+      return out;
+    };
+
+    const slotsExpandidoPorGrupo = new Map();
+    const getSlotsGrupoExpandido = (idGrupo) => {
+      const gid = Number(idGrupo);
+      if (!Number.isFinite(gid)) return [];
+      if (slotsExpandidoPorGrupo.has(gid)) return slotsExpandidoPorGrupo.get(gid);
+      const slots = horario_fijo
+        .filter((h) => h.dia === dia && Number(h.id_grupo) === gid)
+        .slice()
+        .sort((a, b) => (timeToMinutes(a.hora_inicio) ?? 0) - (timeToMinutes(b.hora_inicio) ?? 0));
+      const expanded = expandirSlotsPorHora(slots);
+      slotsExpandidoPorGrupo.set(gid, expanded);
+      return expanded;
+    };
+
     const staffIds = (h) => {
       const ids = [h?.id_profesor, h?.id_profesor_aux ?? h?.id_auxiliar ?? null]
         .map((x) => (x === null || x === undefined || x === '' ? null : Number(x)))
-        .filter((x) => Number.isFinite(x));
+        .filter((x) => Number.isFinite(x) && x > 0);
       return [...new Set(ids)];
     };
 
@@ -994,22 +1039,22 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (excludeSet.has(Number(h.id_horario_fijo_detalle))) return false; // Excluir slots de la sesión actual
         if (!ocupaEnMinuto(h, tMin)) return false;
         const hStaff = staffIds(h);
-        return hStaff.some((pid) => ids.includes(pid));
+        if (!hStaff.some((pid) => ids.includes(pid))) return false;
+        // Si esa clase está cancelada por incidencia, no bloquea disponibilidad
+        const hGrupo = Number(h.id_grupo);
+        if (horaLibrePorIncidencia(hGrupo, tMin)) return false;
+        return true;
       });
     };
 
-    const claseGrupoEnHora = (idGrupo, horaInicioHHMM) =>
-      horario_fijo.find(
-        (h) =>
-          h.dia === dia &&
-          Number(h.id_grupo) === Number(idGrupo) &&
-          hhmm(h.hora_inicio) === hhmm(horaInicioHHMM)
-      );
+    const claseGrupoEnHora = (idGrupo, horaInicioHHMM) => {
+      const slots = getSlotsGrupoExpandido(idGrupo);
+      return slots.find((h) => hhmm(h.hora_inicio) === hhmm(horaInicioHHMM));
+    };
 
     const ausenciasDia = ausencias_profesor
       .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
       .filter((a) => normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor');
-    // group -> timeMin -> Set(id_profesor)
     const ausenciasPorGrupoTiempo = new Map();
     for (const a of ausenciasDia) {
       const gid = Number(a.id_grupo);
@@ -1022,29 +1067,48 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       map.get(mins).add(pid);
     }
 
+    const ausenciaHorasPorGrupo = new Map();
+    for (const idGrupo of ausenciasPorGrupoTiempo.keys()) {
+      const slotsGrupoExpandido = getSlotsGrupoExpandido(idGrupo);
+      if (slotsGrupoExpandido.length === 0) continue;
+
+      const sesiones = agruparSesiones(slotsGrupoExpandido);
+      const horasAusentes = new Set();
+
+      for (const sesion of sesiones) {
+        const primerSlot = sesion.slots[0];
+        const startMins = timeToMinutes(primerSlot?.hora_inicio);
+        if (startMins === null) continue;
+        const req = staffIds(primerSlot);
+        if (req.length === 0) continue;
+        const absentSet = ausenciasPorGrupoTiempo.get(Number(idGrupo))?.get(startMins);
+        if (!absentSet) continue;
+        // Si hay auxiliar asignado, debe estar ausente también.
+        const cubreSesion = req.every((pid) => absentSet.has(pid));
+        if (!cubreSesion) continue;
+
+        for (let i = 0; i < sesion.slots.length; i++) {
+          horasAusentes.add(startMins + i * 60);
+        }
+      }
+
+      if (horasAusentes.size > 0) ausenciaHorasPorGrupo.set(Number(idGrupo), horasAusentes);
+    }
+
     const horaLibrePorIncidencia = (idGrupo, startMins) => {
-      const clase = claseGrupoEnHora(idGrupo, minutesToHHMM(startMins));
-      if (!clase) return false;
-      const req = staffIds(clase);
-      if (req.length === 0) return false;
-      const absentSet = ausenciasPorGrupoTiempo.get(Number(idGrupo))?.get(startMins);
-      if (!absentSet) return false;
-      // Regla: si hay auxiliar asignado, debe estar ausente también.
-      return req.every((pid) => absentSet.has(pid));
+      const set = ausenciaHorasPorGrupo.get(Number(idGrupo));
+      return set ? set.has(startMins) : false;
     };
 
     const propuestas = [];
     const visto = new Set();
 
     for (const [idGrupo, timeMap] of ausenciasPorGrupoTiempo.entries()) {
-      const slotsGrupo = horario_fijo
-        .filter((h) => h.dia === dia && Number(h.id_grupo) === Number(idGrupo))
-        .slice()
-        .sort((a, b) => (timeToMinutes(a.hora_inicio) ?? 0) - (timeToMinutes(b.hora_inicio) ?? 0));
+      const slotsGrupoExpandido = getSlotsGrupoExpandido(idGrupo);
 
-      if (slotsGrupo.length === 0) continue;
+      if (slotsGrupoExpandido.length === 0) continue;
 
-      const sesiones = agruparSesiones(slotsGrupo);
+      const sesiones = agruparSesiones(slotsGrupoExpandido);
       const ultimaSesion = sesiones[sesiones.length - 1];
       if (!ultimaSesion || ultimaSesion.slots.length === 0) continue;
 
@@ -1068,23 +1132,20 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
       const ausenciaStarts = [...timeMap.keys()].sort((a, b) => a - b);
       for (const ausenciaStartMins of ausenciaStarts) {
-        // Debe adelantar: la hora libre debe ser antes del inicio de la sesión final
+        // la hora libre debe ser antes del inicio de la sesión final
         if (ausenciaStartMins >= sesionStartMins) continue;
 
-        // Si en esa hora NO está libre por incidencia (incluye aux si aplica), no cuenta.
+        // Si en esa hora no esta libre por incidencia no cuenta.
         if (!horaLibrePorIncidencia(idGrupo, ausenciaStartMins)) continue;
 
-        // Calcular cuántas horas consecutivas están libres (basadas en el staff disponible)
-        // Primera hora debe tener ausencia registrada; siguientes solo necesitan staff disponible
-        // Excluir de check de disponibilidad los slots de la sesión actual (que se van a adelantar)
+        // Calcular cuantas horas consecutivas están libres
+        // Cada hora debe estar libre por ausencia y con porfe disponible
+        // Excluir de check de disponibilidad los slots de la sesión actual (nos esta follando el dinamico a copilot y a mi D:)
         const excludeSlotIds = ultimaSesion.slots.map(s => Number(s.id_horario_fijo_detalle));
         let maxConsec = 0;
         for (let i = 0; i < sesionLen; i++) {
           const t = ausenciaStartMins + i * 60;
-          // Primera hora: debe haber ausencia; siguientes: solo necesitan staff libre
-          if (i === 0) {
-            if (!horaLibrePorIncidencia(idGrupo, t)) break;
-          }
+          if (!horaLibrePorIncidencia(idGrupo, t)) break;
           if (!staffLibreEnExcluyendo([titularIdSesion], minutesToHHMM(t), excludeSlotIds)) break;
           maxConsec++;
         }
@@ -1094,8 +1155,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         const materia = materias.find((m) => Number(m.id_materia) === Number(slotFinal.id_materia));
         const durBloque = 50;
 
-        // Calcular el máximo de bloques que se pueden adelantar (limitado por horas libres y duración de la sesión)
-        // Se crea UNA sola propuesta con el máximo, no múltiples propuestas
+        // Calcular el maximo de bloques de horas que se pueden adelantar (hasta la polla)
+        // Se crea la sola propuesta tarjetita con el maximo, no duplicados coño
         const maxParcial = Math.min(maxConsec, sesionLen);
         if (maxParcial > 0) {
           const slotsOrigen = ultimaSesion.slots.slice(sesionLen - maxParcial);
@@ -1122,9 +1183,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       }
     }
 
-    // Filtrar propuestas: excluir aquellas cuyos bloques ya fueron completamente adelantados
+    // excluir aquellas bloques ya fueron completamente adelantados
     const propuestasNoAdelantadas = propuestas.filter((prop) => {
-      // Una propuesta está "adelantada" si TODOS sus slots_origen tienen adelantos en horario_dinamico
       const slotIds = new Set((prop.slots_origen || []).map((s) => Number(s.id_horario_fijo_detalle)));
       if (slotIds.size === 0) return true; // Sin info de origen, mantener
 
@@ -1136,7 +1196,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const slotsConAdelanto = new Set(adelantosParaEstaClase.map((d) => Number(d.id_horario_fijo_detalle)));
       const todosAdelantados = Array.from(slotIds).every((id) => slotsConAdelanto.has(id));
 
-      // Mantener solo si NO está completamente adelantada
+      // Mantener solo si NO está completamente adelantada (nah ni copilot ni yo sabemos q fumada paso aqui)
       return !todosAdelantados;
     });
 
@@ -1165,7 +1225,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (da !== db) return da - db;
         const la = Array.isArray(a.p?.slots_origen) ? a.p.slots_origen.length : 1;
         const lb = Array.isArray(b.p?.slots_origen) ? b.p.slots_origen.length : 1;
-        // Mostrar primero las propuestas más cortas (1 hora antes que 2, etc.)
+        // Mostrar primero las propuestas mas cortas
         return la - lb;
       });
 
@@ -1183,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
         const div = document.createElement('div');
         div.className = 'tarjeta-adelanto';
-        // IMPORTANT: usar el índice real del arreglo (no el índice del sort)
+        // usar el indice real del arreglo
         div.dataset.idx = String(originalIdx);
         div.innerHTML = `
           <div class="adelanto-info">
@@ -1269,26 +1329,30 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
       btnConfirmarAdelanto.disabled = true;
       try {
-        for (let i = 0; i < adelantoPendiente.slots_origen.length; i++) {
-          const slot = adelantoPendiente.slots_origen[i];
-          const hi = minutesToHHMM(destinoStart + i * 60);
-          const hf = minutesToHHMM(destinoStart + i * 60 + dur);
+        const slotsCount = Array.isArray(adelantoPendiente.slots_origen)
+          ? adelantoPendiente.slots_origen.length
+          : 0;
+        const slotBase = slotsCount > 0 ? adelantoPendiente.slots_origen[0] : null;
+        const idDetalle = Number(slotBase?.id_horario_fijo_detalle);
 
-          const idDetalle = Number(slot.id_horario_fijo_detalle);
-          if (!idDetalle) continue;
-
-          await fetchJson(`/horarios/${idDetalle}/adelantar-clase`, {
-            method: 'POST',
-            auth: true,
-            body: {
-              fecha,
-              hora_inicio: hi,
-              hora_fin: hf,
-              id_salon_temporal: idSalon,
-              motivo: adelantoPendiente.motivo || 'Adelanto de clase'
-            }
-          });
+        if (!idDetalle || slotsCount <= 0) {
+          throw new Error('No se pudo identificar el horario a adelantar.');
         }
+
+        const hi = minutesToHHMM(destinoStart);
+        const hf = minutesToHHMM(destinoStart + (slotsCount - 1) * 60 + dur);
+
+        await fetchJson(`/horarios/${idDetalle}/adelantar-clase`, {
+          method: 'POST',
+          auth: true,
+          body: {
+            fecha,
+            hora_inicio: hi,
+            hora_fin: hf,
+            id_salon_temporal: idSalon,
+            motivo: adelantoPendiente.motivo || 'Adelanto de clase'
+          }
+        });
 
         if (modalConfirmarAdelanto) modalConfirmarAdelanto.classList.remove('activo');
         await cargarDatosDinamica(fecha);
@@ -1317,24 +1381,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     contenedor.innerHTML = '';
 
     if (modoVista !== 'dinamica') return;
-
-    if (ultimoErrorDinamica) {
-      const status = ultimoErrorDinamica?.status;
-      const msg = ultimoErrorDinamica?.message || 'No se pudieron cargar datos dinámicos.';
-      const div = document.createElement('div');
-      div.className = 'tarjeta-alerta';
-      const esAuth = status === 401 || status === 403;
-      div.innerHTML = `
-        <div class="alerta-icono error">
-          <span class="material-symbols-outlined md-20">error</span>
-        </div>
-        <div class="alerta-texto">
-          <p>${esAuth ? 'Sin sesión / permisos' : 'Error cargando dinámica'}</p>
-          <p>${esAuth ? 'Inicia sesión como prefecto/admin para ver incidencias.' : msg}</p>
-        </div>
-      `;
-      contenedor.appendChild(div);
-    }
 
     const alerts = [];
     for (const a of ausencias_profesor) {

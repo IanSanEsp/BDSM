@@ -150,7 +150,7 @@ export const crearHorario = async (req, res) => {
 
     await db.beginTransaction();
     try {
-      //obtener o crear el id compartido (catalogo)
+      //obtener o crear el id compartido del catalogo ese
       const idHorarioFijo = await getOrCreateHorarioIdByGrupo(Number(id_grupo), nombre_horario);
 
       // Validar las colisiones dentro del horario del grupo
@@ -228,7 +228,7 @@ export const crearHorario = async (req, res) => {
   }
 };
 
-// Catálogo: todos los profesores (aunque no tengan horarios)
+// catalogo todos los profesores
 export const listarProfesoresCatalogo = async (_req, res) => {
   try {
     const [rows] = await db.query(
@@ -251,7 +251,7 @@ export const listarProfesoresCatalogo = async (_req, res) => {
   }
 };
 
-// Catálogo: todas las materias (aunque no tengan horarios)
+// catalogo todas las materias
 export const listarMateriasCatalogo = async (_req, res) => {
   try {
     const hasMaterias = await tableExists('Materias');
@@ -368,8 +368,7 @@ export const actualizarHorario = async (req, res) => {
     if (id_materia !== undefined) { fields.push("id_materia = ?"); values.push(Number(id_materia)); }
     if (bloque_horario !== undefined) { fields.push("bloque_horario = ?"); values.push(Number(bloque_horario)); }
 
-    // Intentar actualizar por PK detalle; si no existe, tratar :id como id_horario_fijo (catálogo) y
-    // ubicar el registro por (dia, bloque_horario).
+
     let idDetalle = id;
     const [foundDetalle] = await db.query(
       "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
@@ -393,7 +392,7 @@ export const actualizarHorario = async (req, res) => {
       idDetalle = row[0].id_horario_fijo_detalle;
     }
 
-    // id_grupo no está en Horario_Fijo, está en horarios (catálogo)
+
     if (id_grupo !== undefined && Number(id_grupo) > 0) {
       const [currRow] = await db.query(
         "SELECT id_horario_fijo FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
@@ -421,7 +420,7 @@ export const actualizarHorario = async (req, res) => {
       return res.status(404).json({ error: "Horario no encontrado" });
     }
 
-    // Si se cambió el profesor, aplicar el mismo cambio a todos los horarios
+    // Si cambio el profesor aplicar el mismo cambio a todos los horarios
     // del mismo grupo y la misma materia
     if (id_profesor !== undefined) {
       const materiaTarget = id_materia !== undefined ? Number(id_materia) : null;
@@ -455,7 +454,6 @@ export const eliminarHorario = async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Falta id" });
 
-    // Igual que actualizar: intentar por detalle, si no existe, tratar como catálogo y requerir dia+bloque.
     let idDetalle = id;
     const [foundDetalle] = await db.query(
       "SELECT id_horario_fijo_detalle FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
@@ -540,7 +538,7 @@ export const buscarPorBloque = async (req, res) => {
   }
 };
 
-// Reasignar salón en horario dinámico
+// Reasignar salon en horario dinámico
 export const reasignarSalon = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -554,7 +552,6 @@ export const reasignarSalon = async (req, res) => {
       return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
     }
 
-    // :id puede ser id_horario_fijo_detalle (PK) o id_horario_fijo (catálogo)
     let hf = null;
     const [hfByDetalle] = await db.query(
       "SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
@@ -563,7 +560,7 @@ export const reasignarSalon = async (req, res) => {
     if (hfByDetalle && hfByDetalle[0]) {
       hf = hfByDetalle[0];
     } else {
-      // tratar como catálogo: ubicar la clase del día por bloque o por hora
+      // tratar como catálogo ubicar la clase del día por bloque o por hora
       const bloqueTarget = req.body?.bloque_horario !== undefined ? Number(req.body.bloque_horario) : null;
       const hiTarget = hora_inicio ? toTimeWithSeconds(hora_inicio) : null;
       const hfTarget = hora_fin ? toTimeWithSeconds(hora_fin) : null;
@@ -597,14 +594,13 @@ export const reasignarSalon = async (req, res) => {
 
     const diaDin = hf.dia || diaFecha;
 
-    // Antes de crear un nuevo registro dinámico, eliminar cualquier registro previo
-    // para esta misma clase (detalle) en esa fecha: último cambio gana.
+    // Antes de crear un nuevo registro diamico eliminar cualquier registro previo
     await db.query(
       "DELETE FROM Horario_Dinamico WHERE id_horario_fijo_detalle = ? AND fecha = ?",
       [hf.id_horario_fijo_detalle, fecha]
     );
 
-    // Validar que salón temporal exista
+    // Validar que salon temporal exista
     const [sRows] = await db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [id_salon_temporal]);
     if (!sRows || sRows.length === 0) return res.status(400).json({ error: "Salón temporal no encontrado" });
 
@@ -696,7 +692,6 @@ export const adelantarClase = async (req, res) => {
       return res.status(400).json({ error: "fecha inválida o cae en fin de semana" });
     }
 
-    // :id puede ser id_horario_fijo_detalle (PK) o id_horario_fijo (catálogo)
     let hf = null;
     const [hfByDetalle] = await db.query(
       "SELECT * FROM Horario_Fijo WHERE id_horario_fijo_detalle = ? LIMIT 1",
@@ -725,12 +720,11 @@ export const adelantarClase = async (req, res) => {
 
     const diaDin = hf.dia || diaFecha;
 
-    // Solo borrar registros dinámicos que solapan con el nuevo (permite múltiples adelantos no superpuestos)
+    // DB tiene uq_hd_detalle_fecha: solo puede existir un registro por clase+fecha
     await db.query(
       `DELETE FROM Horario_Dinamico
-       WHERE id_horario_fijo_detalle = ? AND fecha = ?
-         AND NOT (hora_fin <= ? OR hora_inicio >= ?)`,
-      [hf.id_horario_fijo_detalle, fecha, hi, hfTime]
+       WHERE id_horario_fijo_detalle = ? AND fecha = ?`,
+      [hf.id_horario_fijo_detalle, fecha]
     );
 
     const [sRows] = await db.query("SELECT id_salon FROM Salones WHERE id_salon = ? LIMIT 1", [salonDestino]);
