@@ -1881,6 +1881,135 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   const modalHorarios = document.getElementById('modal-horarios');
   const cerrarModalHorarios = document.getElementById('cerrar-modal-horarios');
   const contenedorHorariosJerarquico = document.getElementById('contenedor-horarios-jerarquico');
+  // ATENCION mierda de historial q como no le se al frontsito se lo deje a chopilot :D
+  const cuerpoHistorial = modalHistorial ? modalHistorial.querySelector('.modal-cuerpo') : null;
+
+  const renderizarHistorial = () => {
+    if (!cuerpoHistorial) return;
+    cuerpoHistorial.innerHTML = '';
+
+    if (!Array.isArray(horario_fijo) || horario_fijo.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'min-height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af;';
+      empty.textContent = 'Sin horarios.';
+      cuerpoHistorial.appendChild(empty);
+      return;
+    }
+
+    const diasOrden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    const dinamicosFecha = horario_dinamico.filter((h) => (h.fecha || fechaDinamica) === fechaDinamica);
+    const dinamicosPorDetalle = new Map(
+      dinamicosFecha.map((d) => [Number(d.id_horario_fijo_detalle), d])
+    );
+
+    const ausenciasDia = ausencias_profesor
+      .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
+      .filter((a) => normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor');
+    const ausenciasPorGrupoTiempo = new Map();
+    for (const a of ausenciasDia) {
+      const gid = Number(a.id_grupo);
+      const mins = timeToMinutes(a.hora);
+      const pid = Number(a.id_profesor);
+      if (!Number.isFinite(gid) || mins === null || !Number.isFinite(pid)) continue;
+      if (!ausenciasPorGrupoTiempo.has(gid)) ausenciasPorGrupoTiempo.set(gid, new Map());
+      const map = ausenciasPorGrupoTiempo.get(gid);
+      if (!map.has(mins)) map.set(mins, new Set());
+      map.get(mins).add(pid);
+    }
+
+    const horarioCancelado = (h) => {
+      const gid = Number(h.id_grupo);
+      const mins = timeToMinutes(h.hora_inicio);
+      if (!Number.isFinite(gid) || mins === null) return false;
+      const map = ausenciasPorGrupoTiempo.get(gid);
+      if (!map) return false;
+      const absentSet = map.get(mins);
+      if (!absentSet) return false;
+      const req = [h.id_profesor, h.id_profesor_aux ?? h.id_auxiliar ?? null]
+        .map((x) => (x === null || x === undefined || x === '' ? null : Number(x)))
+        .filter((x) => Number.isFinite(x) && x > 0);
+      if (req.length === 0) return false;
+      return req.every((pid) => absentSet.has(pid));
+    };
+
+    const grupoPorId = new Map(grupos.map(g => [Number(g.id_grupo), g]));
+    const materiaPorId = new Map(materias.map(m => [Number(m.id_materia), m]));
+    const usuarioPorId = new Map(usuarios.map(u => [Number(u.id_usuarios), u]));
+    const salonPorId = new Map(salones.map(s => [Number(s.id_salon), s]));
+
+    diasOrden.forEach((dia) => {
+      const horariosDia = horario_fijo
+        .filter((h) => h.dia === dia)
+        .slice()
+        .sort((a, b) => (timeToMinutes(a.hora_inicio) ?? 0) - (timeToMinutes(b.hora_inicio) ?? 0));
+
+      if (horariosDia.length === 0) return;
+
+      const separador = document.createElement('div');
+      separador.className = 'separador-fecha';
+      separador.innerHTML = `<span class="fecha-etiqueta">${dia} • ${fechaDinamica}</span>`;
+      cuerpoHistorial.appendChild(separador);
+
+      horariosDia.forEach((h) => {
+        const grupo = grupoPorId.get(Number(h.id_grupo));
+        const materia = materiaPorId.get(Number(h.id_materia));
+        const profesor = usuarioPorId.get(Number(h.id_profesor));
+        const salon = salonPorId.get(Number(h.id_salon));
+
+        const dyn = dinamicosPorDetalle.get(Number(h.id_horario_fijo_detalle)) || null;
+        const cancelada = horarioCancelado(h);
+        const motivo = dyn?.motivo || dyn?.motivo_cambio || '';
+        const horaOrig = `${hhmm(h.hora_inicio)} - ${hhmm(h.hora_fin)}`;
+        const horaDyn = dyn ? `${hhmm(dyn.hora_inicio)} - ${hhmm(dyn.hora_fin)}` : null;
+        const salonDyn = dyn?.id_salon_temporal ? salonPorId.get(Number(dyn.id_salon_temporal)) : null;
+
+        const div = document.createElement('div');
+        div.className = 'tarjeta-alerta';
+
+        if (dyn) {
+          div.innerHTML = `
+            <div class="alerta-icono advertencia">
+              <span class="material-symbols-outlined md-20">warning</span>
+            </div>
+            <div class="alerta-texto">
+              <p>${motivo || 'Cambio/Adelanto'}</p>
+              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
+              <p>${horaOrig} → ${horaDyn}</p>
+              <p>Salón: ${salonDyn?.numero_salon || salonDyn?.nombre_salon || salon?.numero_salon || 'S/N'}</p>
+              ${cancelada ? '<p>Clase cancelada por ausencia.</p>' : ''}
+            </div>
+          `;
+        } else if (cancelada) {
+          div.innerHTML = `
+            <div class="alerta-icono error">
+              <span class="material-symbols-outlined md-20">person_off</span>
+            </div>
+            <div class="alerta-texto">
+              <p>Clase cancelada</p>
+              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
+              <p>${horaOrig}</p>
+              <p>Salón: ${salon?.numero_salon || 'S/N'}</p>
+            </div>
+          `;
+        } else {
+          div.innerHTML = `
+            <div class="alerta-icono exito">
+              <span class="material-symbols-outlined md-20">check_circle</span>
+            </div>
+            <div class="alerta-texto">
+              <p>Sin cambios</p>
+              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
+              <p>${horaOrig}</p>
+              <p>Salón: ${salon?.numero_salon || 'S/N'}</p>
+            </div>
+          `;
+        }
+
+        cuerpoHistorial.appendChild(div);
+      });
+    });
+  };
+  // ACA acaba la cosa esta del historial (gracias papá chopilot)
 
   // Renderizar
   const renderizarHorariosJerarquico = () => {
@@ -2462,6 +2591,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     opcionHistorial.addEventListener('click', (e) => {
       e.stopPropagation();
       menuKebab.classList.remove('activo');
+      renderizarHistorial();
       modalHistorial.classList.add('activo');
     });
   }
