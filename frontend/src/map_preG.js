@@ -4,6 +4,7 @@ import {
   LAYOUT_PISOS,
   clearSession,
   paintSessionHeader,
+  getSessionToken,
   keySalonName,
   normalizarEstado,
   normalizeText,
@@ -30,6 +31,7 @@ let touchDist0 = 0, zoom0 = 1;
 let zoomPanAbort = null;
 
 let mapaCanvas, mapaGrupo, mapaSvg;
+let ocupadosHorarioKeys = new Set();
 
 function normalizarTipoSalon(salon) {
   const nombreTipo = String(salon?.nombre_tipo_salon || '').trim();
@@ -42,6 +44,131 @@ function toHHMM(time) {
   const s = String(time || '');
   if (s.length >= 5) return s.slice(0, 5);
   return s;
+}
+
+function timeToMinutes(time) {
+  const s = String(time || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
+}
+
+function hoyISO() {
+  return new Date().toLocaleDateString('sv-SE');
+}
+
+function obtenerDiaActual() {
+  const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+  return dias[new Date().getDay()];
+}
+
+const bloquesHorarios = [
+  { inicio: '07:00', fin: '07:50' },
+  { inicio: '08:00', fin: '08:50' },
+  { inicio: '09:00', fin: '09:50' },
+  { inicio: '10:00', fin: '10:50' },
+  { inicio: '11:00', fin: '11:50' },
+  { inicio: '12:00', fin: '12:50' },
+  { inicio: '13:00', fin: '13:50' },
+  { inicio: '14:00', fin: '14:50' },
+  { inicio: '15:00', fin: '15:50' },
+  { inicio: '16:00', fin: '16:50' },
+  { inicio: '17:00', fin: '17:50' },
+  { inicio: '18:00', fin: '18:50' },
+  { inicio: '19:00', fin: '19:50' },
+  { inicio: '20:00', fin: '20:50' }
+];
+
+function bloqueActual() {
+  const ahora = new Date();
+  const mins = ahora.getHours() * 60 + ahora.getMinutes();
+  for (const b of bloquesHorarios) {
+    const [hIni, mIni] = b.inicio.split(':').map(Number);
+    const [hFin, mFin] = b.fin.split(':').map(Number);
+    const ini = hIni * 60 + mIni;
+    const fin = hFin * 60 + mFin;
+    if (mins >= ini && mins <= fin) return b;
+  }
+  return null;
+}
+
+async function cargarOcupacionHorarioActual() {
+  const dia = obtenerDiaActual();
+  const bloque = bloqueActual();
+  if (!dia || !bloque) {
+    ocupadosHorarioKeys = new Set();
+    return;
+  }
+
+  const fecha = hoyISO();
+  const token = getSessionToken();
+
+  const ausenciasPorGrupoHora = new Map();
+  try {
+    const resAus = await fetch(`${apiBase}/ausencias?fecha=${encodeURIComponent(fecha)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+    if (resAus.ok) {
+      const dataAus = await resAus.json();
+      const rows = Array.isArray(dataAus) ? dataAus : (dataAus.ausencias || dataAus.rows || []);
+      for (const a of rows) {
+        const tipo = String(a?.tipo_incidencia || a?.tipo || '').toLowerCase();
+        if (tipo && tipo !== 'ausencia_profesor') continue;
+        const gid = Number(a?.id_grupo);
+        const horaMin = timeToMinutes(a?.hora);
+        if (!Number.isFinite(gid) || horaMin == null) continue;
+        if (!ausenciasPorGrupoHora.has(gid)) ausenciasPorGrupoHora.set(gid, new Set());
+        ausenciasPorGrupoHora.get(gid).add(horaMin);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const qs = new URLSearchParams({
+      dia,
+      hora_inicio: bloque.inicio,
+      hora_fin: bloque.fin,
+      fecha
+    });
+    const res = await fetch(`${apiBase}/horarios/por-bloque?${qs.toString()}`);
+    const data = await res.json();
+    const rows = data && data.horarios ? data.horarios : (Array.isArray(data) ? data : []);
+    const set = new Set();
+    for (const h of rows) {
+      const gid = Number(h?.id_grupo);
+      const startMin = timeToMinutes(h?.hora_inicio);
+      const endMin = timeToMinutes(h?.hora_fin);
+      if (Number.isFinite(gid) && startMin != null) {
+        const ausSet = ausenciasPorGrupoHora.get(gid);
+        if (ausSet) {
+          if (endMin == null || endMin <= startMin) {
+            if (ausSet.has(startMin)) continue;
+          } else {
+            let cancelada = false;
+            for (const t of ausSet.values()) {
+              if (t >= startMin && t < endMin) { cancelada = true; break; }
+            }
+            if (cancelada) continue;
+          }
+        }
+      }
+      const nombre = String(h?.nombre_salon || '').trim();
+      const base = stripSalonPrefix(nombre);
+      const keys = [nombre, base];
+      for (const k of keys) {
+        const key = keySalonName(k);
+        if (key) set.add(key);
+      }
+    }
+    ocupadosHorarioKeys = set;
+  } catch {
+    ocupadosHorarioKeys = new Set();
+  }
 }
 
 async function cargarSalones() {
@@ -217,7 +344,11 @@ function renderMapa() {
     if (esLab && !filtrosActivos.laboratorios) continue;
 
     const apiData = estadoPorKey.get(keySalonName(salon.nombre)) || null;
-    const estado = apiData?.estado || 'default';
+    const baseEstado = apiData?.estado || 'default';
+    const isOcupadoHorario = ocupadosHorarioKeys.has(keySalonName(salon.nombre)) ||
+      ocupadosHorarioKeys.has(keySalonName(stripSalonPrefix(salon.nombre)));
+    let estado = isOcupadoHorario ? 'Ocupado' : baseEstado;
+    if (!isOcupadoHorario && estado === 'Ocupado') estado = 'Disponible';
     const colorKey = COLORES[estado] ? estado : 'default';
     const color = COLORES[colorKey];
 
@@ -569,6 +700,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Datos
   todosLosSalones = await cargarSalones();
+  await cargarOcupacionHorarioActual();
 
   // Pisos
   const botonesPiso = document.querySelectorAll('.selector-piso button');

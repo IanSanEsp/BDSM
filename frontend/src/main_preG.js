@@ -72,6 +72,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hoyISO = () => new Date().toLocaleDateString('sv-SE');
 
+  const toHHMM = (time) => {
+    const s = String(time || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return s;
+    return `${m[1].padStart(2, '0')}:${m[2]}`;
+  };
+
+  const timeToMinutes = (time) => {
+    const s = String(time || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return hh * 60 + mm;
+  };
+
+  const buildAusenciasMap = () => {
+    const map = new Map();
+    const hoy = hoyISO();
+    for (const a of ausenciasData) {
+      const fechaRaw = String(a?.fecha || '').slice(0, 10);
+      const fecha = fechaRaw || hoy;
+      if (fecha !== hoy) continue;
+      const gid = Number(a?.id_grupo);
+      const horaMin = timeToMinutes(a?.hora);
+      if (!Number.isFinite(gid) || horaMin == null) continue;
+      if (!map.has(gid)) map.set(gid, new Set());
+      map.get(gid).add(horaMin);
+    }
+    return map;
+  };
+
+  const claseCancelada = (h, ausMap) => {
+    if (!h) return false;
+    const gid = Number(h.id_grupo);
+    if (!Number.isFinite(gid)) return false;
+    const byHora = ausMap.get(gid);
+    if (!byHora) return false;
+    const startMin = timeToMinutes(h.hora_inicio);
+    const endMin = timeToMinutes(h.hora_fin);
+    if (startMin == null) return false;
+    if (endMin == null || endMin <= startMin) return byHora.has(startMin);
+    for (const t of byHora.values()) {
+      if (t >= startMin && t < endMin) return true;
+    }
+    return false;
+  };
+
   const NS = 'http://www.w3.org/2000/svg';
 
   const MAPA_PREVIEW_SRC = {
@@ -129,6 +178,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(keys);
   }
 
+  const dynHoraInicio = (d) => d?.hora_inicio_temp || d?.hora_inicio || '';
+  const dynHoraFin = (d) => d?.hora_fin_temp || d?.hora_fin || '';
+  const horarioDesdeDinamico = (d) => ({
+    id_grupo: d?.id_grupo,
+    hora_inicio: dynHoraInicio(d),
+    hora_fin: dynHoraFin(d)
+  });
+
+  const buscarDinamicoAdelantoSalon = (idSalon) => {
+    const sid = Number(idSalon);
+    if (!Number.isFinite(sid)) return null;
+    return dinamicaData.find((d) => {
+      const salonId = Number(d?.id_salon_temporal || d?.id_salon);
+      if (salonId !== sid) return false;
+      const motivo = String(d?.motivo || d?.motivo_cambio || '').toLowerCase();
+      return motivo.includes('adelanto');
+    }) || null;
+  };
+
+  const buscarDinamicoEnBloque = (idSalon, dia, bloqueId) => {
+    if (!idSalon || bloqueId == null) return null;
+    const diaLower = String(dia || '').toLowerCase();
+    return dinamicaData.find((d) => {
+      const salonId = Number(d?.id_salon_temporal || d?.id_salon);
+      if (salonId !== Number(idSalon)) return false;
+      if (String(d?.dia || '').toLowerCase() !== diaLower) return false;
+      const h = {
+        hora_inicio: dynHoraInicio(d),
+        hora_fin: dynHoraFin(d)
+      };
+      return claseEnBloque(h, bloqueId);
+    }) || null;
+  };
+
   async function renderizarOverlayMapaPreview() {
     const overlay = document.getElementById('mapa-preview-overlay');
     if (!overlay) return;
@@ -144,6 +227,35 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.innerHTML = '';
 
     const rows = salonesData.filter(s => pisoCoincide(s));
+    const ausMap = buildAusenciasMap();
+    const diaActual = obtenerDiaActual();
+    const bloqueActualId = obtenerBloqueActualId();
+    const ocupadosPorHorario = new Set();
+    const provisionales = new Set();
+
+    if (bloqueActualId != null) {
+      for (const s of rows) {
+        const dyn = buscarDinamicoEnBloque(s.id_salon, diaActual, bloqueActualId);
+        const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+        const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
+        if (dyn && !dynCancelada && motivo.includes('adelanto')) {
+          for (const k of nameKeysForMatch(obtenerNombreSalon(s))) provisionales.add(k);
+        }
+
+        if (dyn && !dynCancelada) {
+          for (const k of nameKeysForMatch(obtenerNombreSalon(s))) ocupadosPorHorario.add(k);
+          continue;
+        }
+      }
+
+      for (const h of horariosData) {
+        if (String(h.dia).toLowerCase() !== String(diaActual).toLowerCase()) continue;
+        if (!claseEnBloque(h, bloqueActualId)) continue;
+        if (claseCancelada(h, ausMap)) continue;
+        const nombreSalon = obtenerNombreSalon(h);
+        for (const k of nameKeysForMatch(nombreSalon)) ocupadosPorHorario.add(k);
+      }
+    }
 
     const estadoPorKey = new Map();
     for (const row of rows) {
@@ -156,10 +268,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const grupo = svgEl('g', { opacity: '1' });
     for (const s of layout.salones) {
-      const estado =
-        nameKeysForMatch(s.nombre)
-          .map(k => estadoPorKey.get(k))
-          .find(Boolean) || 'default';
+      const keyMatch = nameKeysForMatch(s.nombre);
+      const ocupado = keyMatch.some((k) => ocupadosPorHorario.has(k));
+      const esProvisional = keyMatch.some((k) => provisionales.has(k));
+      const baseEstado = keyMatch.map(k => estadoPorKey.get(k)).find(Boolean) || 'default';
+      let estado = ocupado ? 'Ocupado' : baseEstado;
+      if (esProvisional) estado = 'Provisional';
+      if (!ocupado && !esProvisional && estado === 'Ocupado') estado = 'Disponible';
       const color = COLORES[estado] || COLORES.default;
 
       const baseAttrs = {
@@ -241,12 +356,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderizarEstadisticas = () => {
     const salonesPiso = salonesData.filter(s => pisoCoincide(s));
     const total = salonesPiso.length;
+
+    const diaActual = obtenerDiaActual();
+    const bloqueActualId = obtenerBloqueActualId();
+    const ausMap = buildAusenciasMap();
+
+    const estadosActuales = salonesPiso.map((salon) => {
+      let estado = String(salon.estado || '').trim();
+      if (bloqueActualId != null) {
+        const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
+        const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+        const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
+        if (dyn && !dynCancelada && motivo.includes('adelanto')) return 'Provisional';
+        if (dyn && !dynCancelada) return 'Ocupado';
+
+        const hRaw = horariosData.find(h =>
+          Number(h.id_salon) === Number(salon.id_salon) &&
+          String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
+          claseEnBloque(h, bloqueActualId)
+        );
+        const h = hRaw && !claseCancelada(hRaw, ausMap) ? hRaw : null;
+        if (h && estado.toLowerCase() === 'disponible') return 'Ocupado';
+        if (!h && estado.toLowerCase() === 'ocupado') return 'Disponible';
+      }
+      return estado || 'Disponible';
+    });
     
     const stats = {
-      disponibles: salonesPiso.filter(s => s.estado === 'Disponible').length,
-      ocupadas: salonesPiso.filter(s => s.estado === 'Ocupado').length,
-      provisionales: salonesPiso.filter(s => s.estado === 'Provisional').length,
-      mantenimiento: salonesPiso.filter(s => s.estado === 'Mantenimiento' || s.estado === 'En Mantenimiento').length
+      disponibles: estadosActuales.filter(s => s === 'Disponible').length,
+      ocupadas: estadosActuales.filter(s => s === 'Ocupado').length,
+      provisionales: estadosActuales.filter(s => s === 'Provisional').length,
+      mantenimiento: estadosActuales.filter(s => s === 'Mantenimiento' || s === 'En Mantenimiento').length
     };
 
     // Actualizar numeros
@@ -360,17 +500,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     listaSalonesContenedor.innerHTML = '';
 
+    const ausMap = buildAusenciasMap();
+
     salonesPagina.forEach(salon => {
-      const horarioActual = horariosData.find(h =>
+      const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
+      const motivoDyn = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+      const dynShow = dyn;
+      const dynHorario = dynShow ? horarioDesdeDinamico(dynShow) : null;
+      const dynCancelada = dynHorario ? claseCancelada(dynHorario, ausMap) : false;
+      const horarioRaw = horariosData.find(h =>
         Number(h.id_salon) === Number(salon.id_salon) &&
         String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
         claseEnBloque(h, bloqueActualId)
       );
+      const horarioBase = horarioRaw && !claseCancelada(horarioRaw, ausMap)
+        ? horarioRaw
+        : null;
+      const horarioActual = dynShow && !dynCancelada
+        ? {
+            ...dynShow,
+            hora_inicio: dynHoraInicio(dynShow),
+            hora_fin: dynHoraFin(dynShow)
+          }
+        : horarioBase;
 
       const nombreSalon = obtenerNombreSalon(salon);
 
       let estadoVisual = String(salon.estado || '').toLowerCase();
-      if (horarioActual && estadoVisual === 'disponible') {
+      if (!dynCancelada && dyn && motivoDyn.includes('adelanto')) {
+        estadoVisual = 'provisional';
+      } else if (horarioActual && estadoVisual === 'disponible') {
         estadoVisual = 'ocupado';
       } else if (!horarioActual && estadoVisual === 'ocupado') {
         estadoVisual = 'disponible';
@@ -481,8 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
       String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase()
     );
 
+    const ausMap = buildAusenciasMap();
+
     bloquesHorarios.forEach(bloque => {
-      const h = clasesDelDia.find(c => claseEnBloque(c, bloque.id));
+      const hRaw = clasesDelDia.find(c => claseEnBloque(c, bloque.id));
+      const h = hRaw && !claseCancelada(hRaw, ausMap) ? hRaw : null;
 
       const fila = document.createElement('tr');
       if (h) {

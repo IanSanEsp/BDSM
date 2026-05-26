@@ -2,6 +2,7 @@ import {
   COLORES,
   LAYOUT_PISOS,
   keySalonName,
+  getSessionToken,
   normalizarEstado,
   resolveApiBase,
   stripSalonPrefix
@@ -13,6 +14,23 @@ function svgEl(tag, attrs = {}) {
   const el = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
   return el;
+}
+
+function toHHMM(time) {
+  const s = String(time || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return s;
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+function timeToMinutes(time) {
+  const s = String(time || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
 }
 
 function getSalonNombre(row) {
@@ -189,6 +207,34 @@ export async function initSalonSelectorMap({
 
     if (!dia || !hora_inicio || !hora_fin) return new Set();
 
+    const excludeDetalleId = Number(ctx?.exclude_horario_detalle_id);
+    const hasExcludeDetalle = Number.isFinite(excludeDetalleId) && excludeDetalleId > 0;
+
+    let ausenciasPorGrupoHora = new Map();
+    if (fecha) {
+      try {
+        const token = getSessionToken();
+        const resAus = await fetch(`${apiBase}/ausencias?fecha=${encodeURIComponent(fecha)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        });
+        if (resAus.ok) {
+          const dataAus = await resAus.json();
+          const rows = Array.isArray(dataAus) ? dataAus : (dataAus.ausencias || dataAus.rows || []);
+          for (const a of rows) {
+            const tipo = String(a?.tipo_incidencia || a?.tipo || '').toLowerCase();
+            if (tipo && tipo !== 'ausencia_profesor') continue;
+            const gid = Number(a?.id_grupo);
+            const h = timeToMinutes(a?.hora);
+            if (!Number.isFinite(gid) || h == null) continue;
+            if (!ausenciasPorGrupoHora.has(gid)) ausenciasPorGrupoHora.set(gid, new Set());
+            ausenciasPorGrupoHora.get(gid).add(h);
+          }
+        }
+      } catch (e) {
+        // Si no hay sesión, se ignora y se usa ocupación normal
+      }
+    }
+
     try {
       const qs = new URLSearchParams({ dia, hora_inicio, hora_fin });
       if (fecha) qs.set('fecha', fecha);
@@ -197,6 +243,26 @@ export async function initSalonSelectorMap({
       const horarios = safeHorariosFromResponse(data);
       const set = new Set();
       for (const h of horarios) {
+        if (hasExcludeDetalle && Number(h?.id_horario_fijo_detalle) === excludeDetalleId) {
+          continue;
+        }
+        const gid = Number(h?.id_grupo);
+        const startMin = timeToMinutes(h?.hora_inicio);
+        const endMin = timeToMinutes(h?.hora_fin);
+        if (Number.isFinite(gid) && startMin != null) {
+          const ausSet = ausenciasPorGrupoHora.get(gid);
+          if (ausSet) {
+            if (endMin == null || endMin <= startMin) {
+              if (ausSet.has(startMin)) continue;
+            } else {
+              let cancelada = false;
+              for (const t of ausSet.values()) {
+                if (t >= startMin && t < endMin) { cancelada = true; break; }
+              }
+              if (cancelada) continue;
+            }
+          }
+        }
         const nombreSalon = String(h?.nombre_salon || h?.numero_salon || h?.salon || '').trim();
         for (const k of keyCandidates(nombreSalon)) {
           if (k) set.add(k);
