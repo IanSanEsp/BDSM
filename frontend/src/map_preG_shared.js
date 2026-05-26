@@ -62,62 +62,23 @@ export const LAYOUT_PISOS = {
     viewBox: '0 0 9689 7592',
     label: 'Planta Baja',
     salones: [
-      { nombre: 'Aula de Usos Multiples', x: 430, y: 70, w: 1760, h: 1145, tipo: 'Aula' },
-      {
-        nombre: 'Laboratorio de Herramientas Computacionales',
-        x: 10,
-        y: 2920,
-        w: 1430,
-        h: 1300,
-        tipo: 'Laboratorio'
-      },
-      {
-        nombre: 'Laboratorio de Aplicaciones de los Circuitos Digitales',
-        x: 1445,
-        y: 2920,
-        w: 1425,
-        h: 1373,
-        tipo: 'Laboratorio'
-      },
-      {
-        nombre: 'Taller de Microprocesadores y Microcontroladores',
-        x: 15,
-        y: 4685,
-        w: 1635,
-        h: 1565,
-        tipo: 'Laboratorio'
-      },
-      { nombre: 'Taller de Electronica', x: 2060, y: 4685, w: 2165, h: 685, tipo: 'Laboratorio' },
-      {
-        nombre: 'Taller de Electronica Digital',
-        puntos: '1650,4685  2050,4685  2050,5375  3140,5375  3140,6730  1650,6730',
-        tipo: 'Laboratorio'
-      },
-      {
-        nombre: 'Taller de Circuitos Digitales',
-        x: 3145,
-        y: 5375,
-        w: 1078,
-        h: 2180,
-        tipo: 'Laboratorio'
-      },
-      { nombre: 'Laboratorio de Robotica', x: 4630, y: 6573, w: 1178, h: 985, tipo: 'Laboratorio' },
-      { nombre: 'Laboratorio CNC', x: 8155, y: 2930, w: 1500, h: 1365, tipo: 'Laboratorio' },
-      { nombre: 'Autodesk', x: 6720, y: 6635, w: 1250, h: 920, tipo: 'Laboratorio' },
-      {
-        nombre: 'Taller Electrico',
-        puntos: '9655,5280  8355,5280  8355,4707  8575,4707  8575,4300  9655,4300',
-        tipo: 'Laboratorio'
-      },
-      { nombre: 'Taller de Metrologia', x: 8355, y: 6580, w: 1305, h: 975, tipo: 'Laboratorio' },
-      {
-        nombre: 'Taller de Electro-Hidroneumatica',
-        x: 8355,
-        y: 5285,
-        w: 1305,
-        h: 1290,
-        tipo: 'Laboratorio'
-      }
+      { nombre: 'Aula de Usos Multiples', x: 395, y: 1110, w: 1260, h: 815, tipo: 'Aula' },
+      { nombre: 'Laboratorio de Herramientas Computacionales', x: 100, y: 3150, w: 1020, h: 920, tipo: 'Laboratorio' },
+      { nombre: 'Laboratorio de Aplicaciones de los Circuitos Digitales', x: 1120, y: 3150, w: 1020, h: 980, tipo: 'Laboratorio' },
+      { nombre: 'Taller de Microprocesadores y Microcontroladores', x: 100, y: 4410, w: 1170, h: 1115, tipo: 'Laboratorio' },
+      { nombre: 'Taller de Electronica', x: 1570, y: 4410, w: 1540, h: 490, tipo: 'Laboratorio' },
+      { nombre: 'Taller de Electronica Digital', puntos: '1270,4410  1560,4410  1560,4900  2335,4900  2335,5855  1270,5855', tipo: 'Laboratorio' },
+      { nombre: 'Taller de Circuitos Digitales', x: 2335, y: 4900, w: 775, h: 1560, tipo: 'Laboratorio' },
+      { nombre: 'Laboratorio de Robotica', x: 3400, y: 5758, w: 843, h: 700, tipo: 'Laboratorio' },
+      { nombre: 'Laboratorio CNC', x: 5920, y: 3150, w: 1075, h: 975, tipo: 'Laboratorio' },
+      { nombre: 'Autodesk', x: 4895, y: 5800, w: 895, h: 665, tipo: 'Laboratorio' },
+      { nombre: 'Taller Electrico', puntos: '6995,4840  6065,4840  6065,4420  6220,4420  6220,4125  6995,4125', tipo: 'Laboratorio' },
+      { nombre: 'Taller de Metrologia', x: 6065, y: 4840, w: 930, h: 920, tipo: 'Laboratorio' },
+      { nombre: 'Taller de Electro-Hidroneumatica', x: 6065, y: 5755, w: 930, h: 710, tipo: 'Laboratorio' },
+      { nombre: 'Gallinero 1', x: 7400, y: 4415, w: 910, h: 713, tipo: 'Aula' },
+      { nombre: 'Gallinero 2', x: 8655, y: 4415, w: 910, h: 713, tipo: 'Aula' },
+      { nombre: 'Gallinero 3', x: 7420, y: 5515, w: 713, h: 910, tipo: 'Aula' },
+      { nombre: 'Gallinero 4', x: 8865, y: 5515, w: 713, h: 910, tipo: 'Aula' }
     ]
   },
   1: {
