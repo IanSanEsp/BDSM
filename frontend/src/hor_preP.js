@@ -3104,7 +3104,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
     // Mostrar/ocultar acciones según modo
     if (infoBotonAccion) {
-      infoBotonAccion.style.display = (modoVista === 'robusta') ? 'none' : '';
+      const esAdelanto = !!horario?.id_horario_dinamico;
+      infoBotonAccion.style.display = (modoVista === 'robusta' || esAdelanto) ? 'none' : '';
     }
 
     horarioActualEnWidget = horario; // guarda horario actual (registrar incidencia)

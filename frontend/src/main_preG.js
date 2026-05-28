@@ -635,24 +635,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cuerpoTablaHorario.innerHTML = '';
 
-    const clasesDelDia = horariosData.filter(h =>
-      Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
-      String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase()
-    );
-
     const ausMap = buildAusenciasMap();
 
     bloquesHorarios.forEach(bloque => {
-      const hRaw = clasesDelDia.find(c => claseEnBloque(c, bloque.id));
-      const h = hRaw && !claseCancelada(hRaw, ausMap) ? hRaw : null;
-
+      const dyn = buscarDinamicoEnBloque(salonSeleccionado.id_salon, diaSeleccionadoModal, bloque.id);
+      const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
+      const h = (dyn && !dynCancelada) ? { ...dyn, hora_inicio: dynHoraInicio(dyn), hora_fin: dynHoraFin(dyn) }
+        : horariosData.find(h =>
+            Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
+            String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase() &&
+            claseEnBloque(h, bloque.id)
+          );
+      const hFinal = h && !(dyn && !dynCancelada) ? (claseCancelada(h, ausMap) ? null : h) : h;
       const fila = document.createElement('tr');
-      if (h) {
+      if (hFinal) {
         fila.innerHTML = `
           <td><strong>${bloque.hora}</strong></td>
-          <td>${h.nombre_grupo || '-'}</td>
-          <td>${h.materia || '-'}</td>
-          <td>${h.nombre_profesor || '-'}</td>
+          <td>${hFinal.nombre_grupo || '-'}</td>
+          <td>${hFinal.materia || '-'}</td>
+          <td>${hFinal.nombre_profesor || '-'}</td>
         `;
       } else {
         fila.innerHTML = `

@@ -444,34 +444,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     listaSalonesContenedor.innerHTML = '';
 
+    const ausMap = buildAusenciasMap();
+
     paginaSalones.forEach(salon => {
-      const horarioActual = horariosData.find(h =>
+      const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
+      const motivoDyn = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+      const dynHorario = dyn ? horarioDesdeDinamico(dyn) : null;
+      const dynCancelada = dynHorario ? claseCancelada(dynHorario, ausMap) : false;
+      const horarioRaw = horariosData.find(h =>
         Number(h.id_salon) === Number(salon.id_salon) &&
-        h.dia === diaActual &&
-        h.bloque_horario === bloqueActualId
+        String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
+        claseEnBloque(h, bloqueActualId)
       );
+      const horarioBase = horarioRaw && !claseCancelada(horarioRaw, ausMap)
+        ? horarioRaw
+        : null;
+      const horarioActual = dyn && !dynCancelada
+        ? { ...dyn, hora_inicio: dynHoraInicio(dyn), hora_fin: dynHoraFin(dyn) }
+        : horarioBase;
 
-      const materiaNombre = horarioActual?.materia || horarioActual?.nombre_materia || '-- --';
-      const profesorNombre = horarioActual?.nombre_profesor || '----';
-      const grupoNombre = horarioActual?.nombre_grupo || '----';
+      const nombreSalon = obtenerNombreSalon(salon);
 
-      let estadoVisual = salon.estado.toLowerCase();
-      if (horarioActual && estadoVisual === 'disponible') estadoVisual = 'ocupado';
-      else if (!horarioActual && estadoVisual === 'ocupado') estadoVisual = 'disponible';
+      let estadoVisual = String(salon.estado || '').toLowerCase();
+      if (!dynCancelada && dyn && motivoDyn.includes('adelanto')) {
+        estadoVisual = 'provisional';
+      } else if (horarioActual && estadoVisual === 'disponible') {
+        estadoVisual = 'ocupado';
+      } else if (!horarioActual && estadoVisual === 'ocupado') {
+        estadoVisual = 'disponible';
+      }
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
           <div class="salon-id-celda ${estadoVisual}">
             <span class="punto-estado ${estadoVisual}"></span>
-            <span>${salon.nombre_salon}</span>
+            <span>${nombreSalon}</span>
           </div>
         </td>
-        <td><span class="grupo-celda">${grupoNombre}</span></td>
+        <td>
+          <span class="grupo-celda">${horarioActual?.nombre_grupo || '----'}</span>
+        </td>
         <td>
           <div class="materia-profesor-celda">
-            <span class="materia-nombre">${materiaNombre}</span>
-            <span class="profesor-nombre">${profesorNombre}</span>
+            <span class="materia-nombre">${horarioActual?.materia || '-- --'}</span>
+            <span class="profesor-nombre">${horarioActual?.nombre_profesor || '----'}</span>
           </div>
         </td>
         <td>
@@ -523,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnMantenimiento.addEventListener('click', (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
-        alert(`Cambiando salón ${salon.nombre_salon} a estado de mantenimiento (Simulación)`);
+        alert(`Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`);
       });
 
       listaSalonesContenedor.appendChild(tr);
@@ -548,19 +565,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const actualizarTablaHorarioModal = () => {
     if (!salonSeleccionado || !cuerpoTablaHorario) return;
     cuerpoTablaHorario.innerHTML = '';
+    const ausMap = buildAusenciasMap();
     bloquesHorarios.forEach(bloque => {
-      const h = horariosData.find(h =>
-        Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
-        h.dia === diaSeleccionadoModal &&
-        h.bloque_horario === bloque.id
-      );
+      const dyn = buscarDinamicoEnBloque(salonSeleccionado.id_salon, diaSeleccionadoModal, bloque.id);
+      const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
+      const h = (dyn && !dynCancelada) ? { ...dyn, hora_inicio: dynHoraInicio(dyn), hora_fin: dynHoraFin(dyn) }
+        : horariosData.find(h =>
+            Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
+            String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase() &&
+            claseEnBloque(h, bloque.id)
+          );
+      const hFinal = h && !(dyn && !dynCancelada) ? (claseCancelada(h, ausMap) ? null : h) : h;
       const fila = document.createElement('tr');
-      if (h) {
+      if (hFinal) {
         fila.innerHTML = `
           <td><strong>${bloque.hora}</strong></td>
-          <td>${h.nombre_grupo || '-'}</td>
-          <td>${h.materia || h.nombre_materia || '-'}</td>
-          <td>${h.nombre_profesor || '-'}</td>
+          <td>${hFinal.nombre_grupo || '-'}</td>
+          <td>${hFinal.materia || '-'}</td>
+          <td>${hFinal.nombre_profesor || '-'}</td>
         `;
       } else {
         fila.innerHTML = `<td><strong>${bloque.hora}</strong></td><td colspan="3" style="color:#9ca3af;font-style:italic;">Sin clase</td>`;
