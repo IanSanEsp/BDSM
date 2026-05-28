@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Salones - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/sal_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preP.html" class="enlace-nav activo">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content -->
+      <main class="contenido-principal">
+        <header class="cabecera">
+          <div class="titulo-pagina"><h1 class="fuente-encabezado" style="font-size: 1.5rem; font-weight: 800;">Salones</h1></div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario" id="nombre-usuario-header">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto de Piso</p>
+                </div>
+                <div class="avatar" id="avatar-header">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="area-contenido">
+          <div class="titulo-seccion">
+            <div class="filtros-izquierda">
+              <!-- Indicador de piso (sin selector) -->
+              <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:#f1f5f9;border-radius:8px;font-size:0.8rem;font-weight:700;color:#475569;">
+                <span class="material-symbols-outlined" style="font-size:16px;">layers</span>
+                <span id="label-piso-actual">PISO 3</span>
+              </div>
+            </div>
+
+            <div class="controles-filtros">
+              <div class="contenedor-menu-kebab">
+                <button class="boton-filtro" id="boton-kebab"><span class="material-symbols-outlined md-24">more_vert</span></button>
+                <div class="menu-desplegable" id="menu-kebab">
+                  <button class="opcion-menu" id="opcion-filtros"><span class="material-symbols-outlined md-18">filter_list</span><span>Filtros</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rejilla-principal">
+            <div class="contenedor-tabla">
+              <div class="tabla-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>SALON / HORA</th>
+                      <th>07:00 - 07:50</th>
+                      <th>08:00 - 08:50</th>
+                      <th>09:00 - 09:50</th>
+                      <th>10:00 - 10:50</th>
+                      <th>11:00 - 11:50</th>
+                      <th>12:00 - 12:50</th>
+                      <th>13:00 - 13:50</th>
+                      <th>14:00 - 14:50</th>
+                      <th>15:00 - 15:50</th>
+                      <th>16:00 - 16:50</th>
+                      <th>17:00 - 17:50</th>
+                      <th>18:00 - 18:50</th>
+                      <th>19:00 - 19:50</th>
+                      <th>20:00 - 20:50</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cuerpo-tabla-horarios">
+                    <!-- js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Widgets inferiores -->
+          <div class="rejilla-inferior">
+            <div class="widget widget-salones-lista">
+              <div class="widget-cabecera">
+                <span class="material-symbols-outlined">meeting_room</span>
+                <h3>SALONES</h3>
+              </div>
+              <div class="widget-contenido">
+                <div class="contenedor-tabla-salones">
+                  <table class="tabla-dashboard">
+                    <thead>
+                      <tr>
+                        <th>Salón</th>
+                        <th>Piso</th>
+                        <th>Tipo</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="lista-salones-widget"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="widget widget-alertas-salones">
+              <div class="widget-cabecera">
+                <span class="material-symbols-outlined">notifications_active</span>
+                <h3>ALERTAS</h3>
+              </div>
+              <div class="widget-contenido">
+                <div class="widget-alert-list" id="lista-alertas-widget"></div>
+                <button class="btn-ver-todas" id="btn-ver-todas-salones">Ver todas</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTO DE PISO DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Modal Horario Salón -->
+    <div id="modal-horario-salon" class="modal-overlay">
+      <div class="modal-contenido modal-grande">
+        <div class="modal-cabecera">
+          <h2 id="titulo-modal-horario">Horario de Salón</h2>
+          <button id="cerrar-modal-horario" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo scroll-v">
+          <div class="controles-modal">
+            <div class="grupo-botones" id="selector-dia-modal">
+              <button class="boton-filtro" data-dia="Lunes">Lun</button>
+              <button class="boton-filtro" data-dia="Martes">Mar</button>
+              <button class="boton-filtro" data-dia="Miércoles">Mié</button>
+              <button class="boton-filtro" data-dia="Jueves">Jue</button>
+              <button class="boton-filtro" data-dia="Viernes">Vie</button>
+            </div>
+          </div>
+          <div class="contenedor-tabla-simple">
+            <table class="tabla-simple">
+              <thead>
+                <tr><th>Bloque</th><th>Grupo</th><th>Materia</th><th>Profesor</th></tr>
+              </thead>
+              <tbody id="cuerpo-tabla-horario-salon"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Historial de Alertas -->
+    <div id="modal-historial-alertas" class="modal-overlay">
+      <div class="modal-contenido modal-grande">
+        <div class="modal-cabecera">
+          <h2>Historial de Alertas</h2>
+          <button id="cerrar-historial-alertas" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo scroll-v" id="cuerpo-historial-alertas"></div>
+      </div>
+    </div>
+
+    <script type="module" src="src/sal_preP.js"></script>
+  </body>
+</html>

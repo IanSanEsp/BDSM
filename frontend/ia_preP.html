@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sIAmon - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/ia_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preP.html" class="enlace-nav activo">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="contenido-ia">
+        <header class="cabecera">
+          <div class="titulo-pagina">
+            <h1 class="titulo-ia fuente-encabezado">sIAmon</h1>
+          </div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario" id="nombre-usuario-header">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto de Piso</p>
+                </div>
+                <div class="avatar" id="avatar-header">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="area-ia">
+
+          <!-- Panel izquierdo: historial de conversaciones -->
+          <div class="panel-conversaciones">
+            <div class="conv-header">
+              <span class="conv-header-titulo">CONVERSACIONES RECIENTES</span>
+            </div>
+
+            <div class="conv-lista" id="conv-lista">
+              <div class="conv-item activo">
+                <div class="conv-info">
+                  <p class="conv-titulo">Consulta Horarios 2026</p>
+                  <p class="conv-fecha">Hoy, 10:24 AM</p>
+                </div>
+                <button class="conv-menu-btn">
+                  <span class="material-symbols-outlined" style="font-size:18px;">more_vert</span>
+                </button>
+              </div>
+              <div class="conv-item">
+                <div class="conv-info">
+                  <p class="conv-titulo">Algo algo algo algo</p>
+                  <p class="conv-fecha">Ayer, 4:15 PM</p>
+                </div>
+              </div>
+              <div class="conv-item">
+                <div class="conv-info">
+                  <p class="conv-titulo">Algo algo algo algo cosas</p>
+                  <p class="conv-fecha">4 de Abr, 2026</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="conv-footer">
+              <button class="btn-nueva-consulta" id="btn-nueva-consulta">
+                <span class="material-symbols-outlined md-18">add</span>
+                Nueva Consulta
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel derecho: área de chat -->
+          <div class="panel-chat">
+            <div class="chat-mensajes" id="chat-mensajes"></div>
+
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <input
+                  type="text"
+                  id="chat-input"
+                  class="chat-input"
+                  placeholder="Escribe tu consulta aquí..."
+                  autocomplete="off"
+                />
+                <button class="chat-send-btn" id="chat-send-btn">
+                  <span class="material-symbols-outlined">send</span>
+                </button>
+              </div>
+              <p class="chat-disclaimer">sIAmon puede cometer errores. Verifica la información importante con servicios escolares.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTO DE PISO DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+
+    <script type="module" src="src/ia_preP.js"></script>
+  </body>
+</html>

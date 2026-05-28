@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - B D S M CECyT 9</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="src/main_preG.css">
+  </head>
+  <body>
+    <div id="aplicacion" class="contenedor-aplicacion">
+      <!-- navbar -->
+      <aside class="barra-lateral">
+        <div class="logo-contenedor">
+          <img src="src/img/logo/bdsm_logo.png" alt="BDSM Logo" style="width: 32px; height: 32px; object-fit: contain;">
+          <div class="logo-texto">
+            <h1>B D S M</h1>
+            <p>SPACE MANAGER</p>
+          </div>
+        </div>
+
+        <nav class="navegacion">
+          <ul class="lista-nav">
+            <li>
+              <a href="main_preP.html" class="enlace-nav activo">
+                <span class="material-symbols-outlined md-20">grid_view</span>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="map_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">map</span>
+                <span>Mapa</span>
+              </a>
+            </li>
+            <li>
+              <a href="hor_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">calendar_month</span>
+                <span>Horarios</span>
+              </a>
+            </li>
+            <li>
+              <a href="sal_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">meeting_room</span>
+                <span>Salones</span>
+              </a>
+            </li>
+            <li>
+              <a href="ia_preP.html" class="enlace-nav">
+                <span class="material-symbols-outlined md-20">monitoring</span>
+                <span>sIAmon</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="reloj-contenedor">
+            <h2 id="reloj-tiempo">07 : 44</h2>
+            <p id="reloj-fecha">Lunes 13 de abril</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="contenido-principal">
+        <header class="cabecera">
+          <div class="titulo-pagina">
+            <h1 class="fuente-encabezado" style="font-size: 1.5rem; font-weight: 800;">Dashboard</h1>
+          </div>
+          <div class="acciones-cabecera">
+            <div class="separador-v"></div>
+            <div class="perfil-usuario-wrapper" style="position:relative;">
+              <div class="perfil-usuario" id="perfil-usuario-btn" style="cursor: pointer;">
+                <div class="info-usuario">
+                  <p class="nombre-usuario" id="nombre-usuario-header">Nombre Algo</p>
+                  <p class="rol-usuario">Prefecto de Piso</p>
+                </div>
+                <div class="avatar" id="avatar-header">NA</div>
+              </div>
+              <div class="menu-desplegable" id="menu-perfil-usuario">
+                <button class="opcion-menu" id="opcion-perfil">
+                  <span class="material-symbols-outlined md-18">account_circle</span>
+                  <span>Perfil</span>
+                </button>
+                <button class="opcion-menu" id="opcion-cerrar-sesion">
+                  <span class="material-symbols-outlined md-18">logout</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="area-contenido-dashboard">
+          <!-- Indicador de Piso (sin selector, solo muestra el piso asignado) -->
+          <div class="controles-filtros">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f1f5f9; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #475569;">
+              <span class="material-symbols-outlined" style="font-size: 18px;">layers</span>
+              <span id="label-piso-actual">PISO 3</span>
+            </div>
+          </div>
+
+          <!-- Tabla de Salones -->
+          <div class="contenedor-tabla-dashboard">
+            <table class="tabla-dashboard">
+              <thead>
+                <tr>
+                  <th>SALON</th>
+                  <th>GRUPO</th>
+                  <th>MATERIA & PROFESOR</th>
+                  <th>HORARIO</th>
+                  <th>ACCIONES</th>
+                </tr>
+              </thead>
+              <tbody id="lista-salones-dashboard">
+                <!-- Se llena con js -->
+              </tbody>
+            </table>
+            <div class="footer-tabla-dashboard">
+              <p id="conteo-salones-piso">Mostrando salones en este piso.</p>
+              <div class="paginacion">
+                <button class="btn-pag">Anterior</button>
+                <button class="btn-pag activo">1</button>
+                <button class="btn-pag">Siguiente</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Seccion Inferior (Mapa y Reportes) -->
+          <div class="grid-dashboard-inferior">
+            <!-- Mapa Preview -->
+            <div class="card-dashboard card-mapa-preview">
+              <div class="card-header">
+                <span class="material-symbols-outlined">map</span>
+                <h3 id="titulo-mapa-piso">MAPA PISO</h3>
+              </div>
+              <div class="mapa-preview-container">
+                <div class="mapa-placeholder-img" style="background-image: none; background-color: #f8fafc;">
+                  <img id="mapa-preview-img" class="mapa-preview-img" alt="Vista previa del mapa" />
+                  <svg id="mapa-preview-overlay" class="mapa-preview-overlay" aria-hidden="true"></svg>
+                </div>
+                <button class="btn-expandir-mapa" id="btn-ir-mapa">
+                  <span class="material-symbols-outlined">open_in_new</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Reportes del Piso -->
+            <div class="card-dashboard card-reportes">
+              <div class="card-header">
+                <span class="material-symbols-outlined md-18">notifications_active</span>
+                <h3>ALERTAS DE PISO</h3>
+              </div>
+              <div class="lista-reportes widget-alert-list" id="lista-reportes-dashboard">
+                <!-- Se llena con js -->
+              </div>
+              <button class="btn-ver-todas" id="btn-ver-todas-alertas">Ver todas</button>
+            </div>
+
+            <div class="card-dashboard card-estadisticas">
+              <div class="card-header">
+                <span class="material-symbols-outlined">analytics</span>
+                <h3>RESUMEN DE AULAS</h3>
+              </div>
+              <div class="estadisticas-cuerpo">
+                <div class="gauge-contenedor">
+                  <svg viewBox="0 0 100 50" class="gauge-svg">
+                    <path class="gauge-fondo" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#f1f5f9" stroke-width="12" stroke-linecap="round" />
+                    <path id="gauge-mantenimiento" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#94a3b8" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 125.6" stroke-dashoffset="0" />
+                    <path id="gauge-provisionales" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 125.6" stroke-dashoffset="0" />
+                    <path id="gauge-ocupadas" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#ef4444" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 125.6" stroke-dashoffset="0" />
+                    <path id="gauge-disponibles" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 125.6" stroke-dashoffset="0" />
+                  </svg>
+                  <div class="gauge-texto">
+                    <span id="total-aulas-num" class="gauge-numero">0</span>
+                    <span class="gauge-etiqueta">aulas</span>
+                  </div>
+                </div>
+
+                <div class="grid-resumen-estados">
+                  <div class="item-resumen">
+                    <p class="resumen-label">DISPONIBLES</p>
+                    <p id="resumen-disponibles" class="resumen-valor texto-exito">0</p>
+                  </div>
+                  <div class="item-resumen">
+                    <p class="resumen-label">OCUPADAS</p>
+                    <p id="resumen-ocupadas" class="resumen-valor texto-error">0</p>
+                  </div>
+                  <div class="item-resumen">
+                    <p class="resumen-label">PROVISIONALES</p>
+                    <p id="resumen-provisionales" class="resumen-valor texto-advertencia">0</p>
+                  </div>
+                  <div class="item-resumen">
+                    <p class="resumen-label">MANTENIMIENTO</p>
+                    <p id="resumen-mantenimiento" class="resumen-valor texto-mantenimiento">0</p>
+                  </div>
+                </div>
+
+                <button class="btn-ver-todas" id="btn-ver-detalle-estadisticas">
+                  <span>VER DETALLE COMPLETO</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+          <div>© 2026 CECYT 9 "JUAN DE DIOS BÁTIZ" - © 2026 VOXIMON LABS</div>
+          <div class="footer-derecha">PREFECTO DE PISO DEL CECYT</div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Modal Horario Completo -->
+    <div id="modal-horario-salon" class="modal-overlay">
+      <div class="modal-contenido modal-grande">
+        <div class="modal-cabecera">
+          <h2 id="titulo-modal-horario">Horario de Salón</h2>
+          <button id="cerrar-modal-horario" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo scroll-v">
+          <div class="controles-modal">
+            <div class="grupo-botones" id="selector-dia-modal">
+              <button class="boton-filtro" data-dia="Lunes">Lun</button>
+              <button class="boton-filtro" data-dia="Martes">Mar</button>
+              <button class="boton-filtro" data-dia="Miércoles">Mié</button>
+              <button class="boton-filtro" data-dia="Jueves">Jue</button>
+              <button class="boton-filtro" data-dia="Viernes">Vie</button>
+            </div>
+          </div>
+          <div class="contenedor-tabla-simple">
+            <table class="tabla-simple">
+              <thead>
+                <tr>
+                  <th>Bloque</th>
+                  <th>Grupo</th>
+                  <th>Materia</th>
+                  <th>Profesor</th>
+                </tr>
+              </thead>
+              <tbody id="cuerpo-tabla-horario-salon"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Historial de Alertas -->
+    <div id="modal-alertas" class="modal-overlay">
+      <div class="modal-contenido modal-grande">
+        <div class="modal-cabecera">
+          <h2>Historial de Alertas</h2>
+          <button id="cerrar-modal-alertas" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo scroll-v" id="cuerpo-modal-alertas"></div>
+      </div>
+    </div>
+
+    <!-- Modal Registrar Incidencia -->
+    <div id="modal-registrar-incidencia" class="modal-overlay">
+      <div class="modal-contenido modal-grande" style="max-width:500px;">
+        <div class="modal-cabecera">
+          <h2>Registrar Incidencia</h2>
+          <button id="cerrar-modal-registrar-incidencia" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo">
+          <form id="form-registrar-incidencia" class="formulario-registro">
+            <div class="campo-formulario">
+              <label>Tipo de Incidencia</label>
+              <select id="inc-tipo" required>
+                <option value="">Seleccionar Tipo</option>
+                <option value="ausencia_profesor">Ausencia - Profesor</option>
+                <option value="junta">Junta Académica</option>
+                <option value="excursion">Excursión</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div class="campo-formulario oculto" id="inc-profesor-container">
+              <label>Profesor ausente</label>
+              <select id="inc-profesor">
+                <option value="">Seleccionar Profesor</option>
+              </select>
+            </div>
+            <div class="campo-formulario oculto" id="inc-hora-container">
+              <label>Hora (registro)</label>
+              <input type="time" id="inc-hora">
+            </div>
+            <div class="campo-formulario">
+              <label>Contexto / Observaciones</label>
+              <textarea id="inc-contexto" rows="3"></textarea>
+            </div>
+            <div class="acciones-incidencia" style="margin-top:8px;">
+              <button type="button" id="btn-codigo-qr" class="boton-secundario oculto">Código QR</button>
+              <button type="submit" class="boton-registro">Registrar Incidencia</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Codigo QR -->
+    <div id="modal-codigo-qr" class="modal-overlay">
+      <div class="modal-contenido modal-grande" style="max-width:380px;">
+        <div class="modal-cabecera">
+          <h2>Código QR</h2>
+          <button id="cerrar-modal-codigo-qr" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo" id="cuerpo-modal-codigo-qr"></div>
+      </div>
+    </div>
+
+    <script type="module" src="src/main_preP.js"></script>
+  </body>
+</html>

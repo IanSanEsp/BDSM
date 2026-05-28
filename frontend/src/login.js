@@ -51,13 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('bdsm_usuario', JSON.stringify(data.usuario));
 
         const tipo = data?.usuario?.tipo_usuario;
+        if (tipo === 'Prefecto de Piso') {
+          window.location.href = 'main_preP.html';
+          return;
+        }
         if (tipo !== 'Prefecto General') {
           localStorage.removeItem('bdsm_token');
           localStorage.removeItem('bdsm_usuario');
-          setError('Demo: por ahora solo está habilitado Prefecto General.');
+          setError('Acceso denegado: tipo de usuario no autorizado.');
           return;
         }
-
         window.location.href = 'main_preG.html';
         return;
       } catch {

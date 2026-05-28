@@ -68,18 +68,20 @@ async function getOrCreateHorarioIdByGrupo(id_grupo, nombre_horario) {
       ? String(nombre_horario).trim()
       : `Horario Grupo ${id_grupo}`;
 
+  const [maxRow] = await db.query("SELECT COALESCE(MAX(id_horario_fijo), 0) + 1 AS next_id FROM horarios");
+  const nextId = maxRow[0].next_id;
 
   const hasGrupoHorario = await tableHasColumn("horarios", "grupo_horario");
   const [ins] = hasGrupoHorario
     ? await db.query(
-        "INSERT INTO horarios (id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?)",
-        [id_grupo, id_grupo, nombre]
+        "INSERT INTO horarios (id_horario_fijo, id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?, ?)",
+        [nextId, id_grupo, id_grupo, nombre]
       )
     : await db.query(
-        "INSERT INTO horarios (id_grupo, nombre_horario) VALUES (?, ?)",
-        [id_grupo, nombre]
+        "INSERT INTO horarios (id_horario_fijo, id_grupo, nombre_horario) VALUES (?, ?, ?)",
+        [nextId, id_grupo, nombre]
       );
-  return ins.insertId;
+  return nextId;
 }
 
 function validarHoraHHMM(h) {

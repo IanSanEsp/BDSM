@@ -5,6 +5,7 @@ import {
 	loginUsuario,
 	registrarAdmin,
 	actualizarUsuario,
+	actualizarMiPerfil,
 	eliminarUsuario,
 	asignarPrefectoPiso
 } from "../controllers/usuariosController.js";
@@ -23,6 +24,9 @@ router.post("/admin/registrar", requireAuth, requireAdmin, registrarAdmin);
 
 // Login
 router.post("/login", loginUsuario);
+
+// Perfil propio: cualquier autenticado puede editar su nombre/correo/turno
+router.put("/me", requireAuth, actualizarMiPerfil);
 
 // Actualizar y eliminar usuario solo Prefecto General
 router.put("/:id", requireAuth, requireAdmin, actualizarUsuario);

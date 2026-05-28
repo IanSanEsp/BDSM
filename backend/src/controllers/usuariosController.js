@@ -249,9 +249,11 @@ export const loginUsuario = async (req, res) => {
               u.correo,
               u.\`contraseña\` AS contrasena_hash,
               u.turno,
-              u.id_grupo
+              u.id_grupo,
+              p.piso_asignado AS piso
        FROM Usuarios u
        JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario
+       LEFT JOIN Prefectos p ON u.id_usuarios = p.id_prefecto
        WHERE u.correo = ? LIMIT 1`,
       [correo]
     );
@@ -292,7 +294,8 @@ export const loginUsuario = async (req, res) => {
         tipo_usuario: user.tipo_usuario,
         correo: user.correo,
         turno: user.turno,
-        id_grupo: user.id_grupo
+        id_grupo: user.id_grupo,
+        piso: user.piso
       }
     });
   } catch (error) {
@@ -301,6 +304,41 @@ export const loginUsuario = async (req, res) => {
   }
 };
 
+
+export const actualizarMiPerfil = async (req, res) => {
+  try {
+    const id = Number(req.user.sub);
+    if (!id) return res.status(401).json({ error: "No autenticado" });
+
+    const { nombre, correo, turno } = req.body || {};
+    const fields = [];
+    const values = [];
+
+    if (nombre !== undefined) { fields.push("nombre = ?"); values.push(nombre); }
+    if (correo !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(correo)) return res.status(400).json({ error: "Correo electrónico inválido" });
+      fields.push("correo = ?"); values.push(correo);
+    }
+    if (turno !== undefined) { fields.push("turno = ?"); values.push(turno); }
+
+    if (fields.length === 0) return res.status(400).json({ error: "No hay campos a actualizar" });
+
+    values.push(id);
+    await db.query(`UPDATE Usuarios SET ${fields.join(", ")} WHERE id_usuarios = ?`, values);
+
+    const [rows] = await db.query(
+      `SELECT u.id_usuarios AS id_usuario, u.nombre, tu.nombre_tipo AS tipo_usuario, u.correo, u.turno, u.id_grupo, p.piso_asignado AS piso
+       FROM Usuarios u JOIN tipo_usuario tu ON u.tipo_usuario = tu.id_tipo_usuario LEFT JOIN Prefectos p ON u.id_usuarios = p.id_prefecto WHERE u.id_usuarios = ? LIMIT 1`,
+      [id]
+    );
+    const actualizado = rows && rows[0] ? rows[0] : null;
+    return res.json({ message: "Perfil actualizado", usuario: actualizado });
+  } catch (error) {
+    console.error("Error actualizando perfil:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
 
 export const actualizarUsuario = async (req, res) => {
   try {
