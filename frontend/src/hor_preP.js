@@ -1,5 +1,6 @@
 import { initSalonSelectorMap } from './sel_salon_map.js';
 import { DEFAULT_API_URL, resolveApiBase, getSessionToken, paintSessionHeader, getSessionUser } from './map_preG_shared.js';
+import { DEFAULT_API_URL, resolveApiBase, getSessionToken, paintSessionHeader, getSessionUser, getLocalDateISO } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', async () => { // namas checa el dom (algo algo w3school)
   console.log('Panel de Control BDSM CECyT 9 cargado');
@@ -58,11 +59,11 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   const stripTipoPrefix = (accion) => String(accion || '').replace(/^\[[a-z_]+\]\s*/i, '').trim();
 
-  const fechaHoyISO = () => new Date().toISOString().split('T')[0];
+  const fechaHoyISO = () => getLocalDateISO();
 
   const fechaYYYYMMDD = (v, fallback = '') => {
     if (v === null || v === undefined || v === '') return fallback;
-    if (v instanceof Date && Number.isFinite(v.getTime())) return v.toISOString().slice(0, 10);
+    if (v instanceof Date && Number.isFinite(v.getTime())) return getLocalDateISO(v);
     const s = String(v).trim();
     const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
     return m ? m[1] : (s || fallback);
@@ -1719,12 +1720,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   const botonesVerTodas = document.querySelectorAll('.boton-ver-todas, .btn-ver-todas');
 
   const formatearFecha = (fechaStr) => {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getLocalDateISO();
     if (fechaStr === hoy) return 'Hoy';
     
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
-    if (fechaStr === ayer.toISOString().split('T')[0]) return 'Ayer';
+    if (fechaStr === getLocalDateISO(ayer)) return 'Ayer';
 
     const opciones = { weekday: 'long', day: 'numeric', month: 'long' };
     const fecha = new Date(fechaStr + 'T00:00:00');

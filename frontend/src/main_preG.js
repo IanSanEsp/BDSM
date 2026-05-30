@@ -7,7 +7,8 @@ import {
   normalizarEstado,
   resolveApiBase,
   stripSalonPrefix,
-  getSessionToken
+  getSessionToken,
+  getLocalDateISO
 } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -894,12 +895,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnVerTodasAlertas = document.getElementById('btn-ver-todas-alertas');
 
   const formatearFecha = (fechaStr) => {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getLocalDateISO();
     if (fechaStr === hoy) return 'Hoy';
     
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
-    if (fechaStr === ayer.toISOString().split('T')[0]) return 'Ayer';
+    if (fechaStr === getLocalDateISO(ayer)) return 'Ayer';
 
     const opciones = { weekday: 'long', day: 'numeric', month: 'long' };
     const fecha = new Date(fechaStr + 'T00:00:00');
@@ -930,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const separador = document.createElement('div');
       separador.className = 'separador-fecha';
       
-      const hoy = new Date().toISOString().split('T')[0];
+      const hoy = getLocalDateISO();
       const fechaTexto = fecha === hoy ? 'HOY' : fecha;
 
       separador.innerHTML = `

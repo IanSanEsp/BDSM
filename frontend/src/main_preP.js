@@ -1,6 +1,6 @@
 import {
   DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, clearSession, paintSessionHeader, getInitials,
-  LAYOUT_PISOS, COLORES, keySalonName, stripSalonPrefix, normalizarEstado
+  LAYOUT_PISOS, COLORES, keySalonName, stripSalonPrefix, normalizarEstado, getLocalDateISO
 } from './map_preG_shared.js';
 
 const apiBase = resolveApiBase() || DEFAULT_API_URL;
@@ -804,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('opcion-perfil')?.addEventListener('click', () => { window.location.href = 'stt_preP.html'; });
   document.getElementById('opcion-cerrar-sesion')?.addEventListener('click', () => { window.location.href = 'index.html'; });
 
-  const hoyISO = () => new Date().toISOString().split('T')[0];
+  const hoyISO = () => getLocalDateISO();
 
   const timeToMinutes = (t) => {
     const s = String(t || '').trim();

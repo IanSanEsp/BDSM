@@ -1,4 +1,4 @@
-import { DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, clearSession, paintSessionHeader, getInitials } from './map_preG_shared.js';
+import { DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, clearSession, paintSessionHeader, getInitials, getLocalDateISO } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const usuarioActual = getSessionUser();
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const cargarDatos = async () => {
-    const fechaHoy = new Date().toISOString().split('T')[0];
+    const fechaHoy = getLocalDateISO();
     const pisoDb = pisoActual === 'L' ? '0' : pisoActual;
     const [salonesRes, horariosRes, gruposRes, ausenciasRes, dinamicaRes, materiasRes] = await Promise.all([
       safeFetch('/salones', {}, []),
@@ -275,10 +275,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const botonVerTodas = document.getElementById('btn-ver-todas-salones');
 
   const formatearFecha = (f) => {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getLocalDateISO();
     const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
     if (f === hoy) return 'Hoy';
-    if (f === ayer.toISOString().split('T')[0]) return 'Ayer';
+    if (f === getLocalDateISO(ayer)) return 'Ayer';
     return new Date(f + 'T00:00:00').toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
   };
 

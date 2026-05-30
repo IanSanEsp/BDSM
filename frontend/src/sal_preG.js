@@ -3,7 +3,8 @@ import {
   paintSessionHeader,
   resolveApiBase,
   DEFAULT_API_URL,
-  getSessionToken
+  getSessionToken,
+  getLocalDateISO
 } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -162,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!raw) return null;
     if (raw instanceof Date) {
       if (Number.isNaN(raw.getTime())) return null;
-      return raw.toISOString().slice(0, 10);
+      return getLocalDateISO(raw);
     }
 
     const s = String(raw).trim();
@@ -172,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (m) return m[1];
 
     const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!Number.isNaN(d.getTime())) return getLocalDateISO(d);
     return s;
   }
 
