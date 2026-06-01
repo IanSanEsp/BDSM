@@ -169,3 +169,15 @@ CREATE TABLE IF NOT EXISTS Grupos_Favoritos (
 
 ALTER TABLE Salones_Favoritos ADD COLUMN mostrar_inicio BOOLEAN DEFAULT FALSE;
 ALTER TABLE Grupos_Favoritos ADD COLUMN mostrar_inicio BOOLEAN DEFAULT FALSE;
+
+-- sIAmon - historial de consultas
+CREATE TABLE IF NOT EXISTS Consultas_IA (
+    id_consulta INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NULL,
+    sesion_id VARCHAR(36) NOT NULL,
+    pregunta TEXT NOT NULL,
+    respuesta TEXT NOT NULL,
+    intento VARCHAR(50),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES Usuarios(id_usuarios) ON DELETE SET NULL
+);

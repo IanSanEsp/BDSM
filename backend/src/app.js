@@ -10,6 +10,7 @@ import ausenciasRoutes from "./routes/ausencias.js";
 import grupoRoutes from "./routes/grupos.js";
 import markerRoutes from "./routes/markers.js";
 import importExportRoutes from "./routes/importExport.js";
+import sAImonRoutes from "./routes/sAImon.js";
 
 dotenv.config();
 const app = express();
@@ -53,6 +54,7 @@ app.use("/api/ausencias", ausenciasRoutes);
 app.use("/api/grupos", grupoRoutes);
 app.use("/api/salon-markers", markerRoutes);
 app.use("/api/data", importExportRoutes);
+app.use("/api/sAImon", sAImonRoutes);
 
 app.get("/", (req, res) => {
   res.send("API BDSM funcionando");
@@ -69,5 +71,6 @@ app.listen(PORT, () => {
   console.log('- /api/grupos');
   console.log('- /api/salon-markers');
   console.log('- /api/data');
+  console.log('- /api/sAImon');
 });
 

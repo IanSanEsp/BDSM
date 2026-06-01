@@ -273,10 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="campo-info-label">Área</span>
           <div class="campo-info-valor">${u.area_educacion || '—'}</div>
         </div>
-        <div class="campo-info">
-          <span class="campo-info-label">Asistencia</span>
-          <div class="campo-info-valor">${u.estado_asistencia || '—'}</div>
-        </div>
       `
       : '';
 
