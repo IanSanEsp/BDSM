@@ -92,14 +92,21 @@ export async function buildDatabaseContext() {
   //Consexo filtrado para el hoy
   const horarioHoy = horarioCompleto.filter(h => h.dia === dia);
 
-  //Ocupacion
-  const ocupadosAhora = horarioHoy.filter(h => h.bloque_horario === bloqueActual);
-  const salonesOcupadosIds = new Set(ocupadosAhora.map(h => h.nombre_salon));
-  const salonesOcupados = ocupadosAhora.map(h => ({
-    salon: h.nombre_salon, grupo: h.nombre_grupo,
+  //Ocupacion: combinar horario_fijo + estado manual de la tabla Salones
+  const ocupadosHorario = horarioHoy.filter(h => h.bloque_horario === bloqueActual).map(h => ({
+    salon: h.nombre_salon, piso: h.piso, grupo: h.nombre_grupo,
     materia: h.nombre_materia, profesor: h.profesor,
-    horario: `${h.hora_inicio?.substring(0,5)}-${h.hora_fin?.substring(0,5)}`
+    horario: `${h.hora_inicio?.substring(0,5)}-${h.hora_fin?.substring(0,5)}`,
+    fuente: 'horario_fijo'
   }));
+  const salonesMarcadosOcupados = salonesConTipo
+    .filter(s => s.estado === 'Ocupado' && !ocupadosHorario.some(o => o.salon === s.nombre))
+    .map(s => ({
+      salon: s.nombre, piso: s.piso, tipo: s.tipo,
+      fuente: 'estado_salon', motivo: 'Marcado como ocupado en la tabla Salones'
+    }));
+  const salonesOcupados = [...ocupadosHorario, ...salonesMarcadosOcupados];
+  const salonesOcupadosIds = new Set(salonesOcupados.map(s => s.salon));
 
   //Gpos sin salones
   const gruposConSalon = new Set(horarioCompleto.map(h => h.nombre_grupo));
@@ -119,7 +126,10 @@ export async function buildDatabaseContext() {
         + "Los prefectos de piso gestionan un piso asignado. "
         + "El horario fijo (tabla robusta) son los horarios base del semestre. "
         + "El horario dinamico registra cambios en tiempo real (reasignaciones, adelantos). "
-        + "Las incidencias registran ausencias de profesores y acciones tomadas.",
+        + "Las incidencias registran ausencias de profesores y acciones tomadas. "
+        + "La ocupacion actual tiene DOS fuentes: (1) horario_fijo -> salones con clase en este bloque, "
+        + "(2) estado_salon -> salones marcados manualmente como Ocupado en la tabla Salones. "
+        + "Ambos son salones OCUPADOS en este momento.",
       pisos_disponibles: [0, 1, 2, 3],
       piso_0_nombre: "Planta Baja (L)",
     },
