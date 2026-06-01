@@ -1,4 +1,4 @@
-export const DEFAULT_API_URL = 'http://localhost:3000/api';
+export const DEFAULT_API_URL = 'https://bdsm-production-8774.up.railway.app/api';
 //http://localhost:3000/api
 //https://bdsm-production-8774.up.railway.app/api
 export const TOKEN_KEY = 'bdsm_token';
