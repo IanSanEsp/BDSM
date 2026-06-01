@@ -1,62 +1,13 @@
 import { db } from "../config/db.js";
+import { hoyMX, horaMX, getBloqueActual, diaMX } from "./timeUtils.js";
 
 function diaDesdeFecha(fecha) {
   if (!fecha || fecha === 'hoy') {
-    const ahora = new Date();
-
-    const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-    return dias[ahora.getDay()];
+    return diaMX();
   }
   const d = new Date(fecha);
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
   return dias[d.getDay()];
-}
-
-function hoyMX() {
-  const ahora = new Date();
-  return ahora.toISOString().split('T')[0];
-}
-
-function horaMX() {
-  const ahora = new Date();
-  return `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}:00`;
-}
-
-const BLOQUES = [
-  { bloque: 1, inicio: '07:00', fin: '07:50' },
-  { bloque: 2, inicio: '07:50', fin: '08:40' },
-  { bloque: 3, inicio: '08:40', fin: '09:30' },
-  { bloque: 4, inicio: '09:30', fin: '10:20' },
-  { bloque: 5, inicio: '10:20', fin: '10:30' },
-  { bloque: 6, inicio: '10:30', fin: '11:20' },
-  { bloque: 7, inicio: '11:20', fin: '12:10' },
-  { bloque: 8, inicio: '12:10', fin: '13:00' },
-  { bloque: 9, inicio: '13:00', fin: '13:50' },
-  { bloque: 10, inicio: '14:00', fin: '14:50' },
-  { bloque: 11, inicio: '14:50', fin: '15:40' },
-  { bloque: 12, inicio: '15:40', fin: '16:30' },
-  { bloque: 13, inicio: '16:30', fin: '17:20' },
-  { bloque: 14, inicio: '17:20', fin: '18:10' },
-  { bloque: 15, inicio: '18:10', fin: '19:00' },
-  { bloque: 16, inicio: '19:00', fin: '19:50' },
-  { bloque: 17, inicio: '19:50', fin: '20:40' },
-  { bloque: 18, inicio: '20:40', fin: '20:50' },
-];
-
-function getBloqueActual() {
-  const ahora = new Date();
-  const h = ahora.getHours();
-  const m = ahora.getMinutes();
-  const totalMin = h * 60 + m;
-
-  for (const b of BLOQUES) {
-    const [hI, mI] = b.inicio.split(':').map(Number);
-    const [hF, mF] = b.fin.split(':').map(Number);
-    const inicioMin = hI * 60 + mI;
-    const finMin = hF * 60 + mF;
-    if (totalMin >= inicioMin && totalMin < finMin) return b.bloque;
-  }
-  return null;
 }
 
 function normalizarPiso(valor) {

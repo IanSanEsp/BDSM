@@ -13,6 +13,7 @@ import {
   sugerirSalones
 } from "../services/dataRetrieval.js";
 import { formatResponse } from "../services/responseFormatter.js";
+import { hoyMX } from "../services/timeUtils.js";
 
 const SYSTEM_PROMPT = `Eres sIAmon, el asistente oficial del sistema BDSM (Batiz Digital Space Manager) del CECyT 9.
 
@@ -123,8 +124,7 @@ export const consultar = async (req, res) => {
           break;
         }
         case 'incidencias': {
-          const hoy = new Date();
-          const fecha = entities?.fecha || hoy.toISOString().split('T')[0];
+          const fecha = entities?.fecha || hoyMX();
           const incidencias = await getIncidencias(fecha);
           data = { incidencias, fecha };
           break;

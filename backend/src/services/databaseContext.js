@@ -1,36 +1,11 @@
 import { db } from "../config/db.js";
-
-function hoyMX() {
-  const ahora = new Date();
-  return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
-}
-
-function getBloqueActual() {
-  const ahora = new Date();
-  const totalMin = ahora.getHours() * 60 + ahora.getMinutes();
-  const bloques = [
-    [1,'07:00','07:50'],[2,'07:50','08:40'],[3,'08:40','09:30'],[4,'09:30','10:20'],
-    [5,'10:20','10:30'],[6,'10:30','11:20'],[7,'11:20','12:10'],[8,'12:10','13:00'],
-    [9,'13:00','13:50'],[10,'14:00','14:50'],[11,'14:50','15:40'],[12,'15:40','16:30'],
-    [13,'16:30','17:20'],[14,'17:20','18:10'],[15,'18:10','19:00'],[16,'19:00','19:50'],
-    [17,'19:50','20:40'],[18,'20:40','20:50']
-  ];
-  for (const b of bloques) {
-    const [hI, mI] = b[1].split(':').map(Number);
-    const [hF, mF] = b[2].split(':').map(Number);
-    if (totalMin >= hI * 60 + mI && totalMin < hF * 60 + mF) return b[0];
-  }
-  return null;
-}
+import { hoyMX, diaMX, getBloqueActual, horaMX } from "./timeUtils.js";
 
 export async function buildDatabaseContext() {
   const fecha = hoyMX();
-  const d = new Date(fecha + 'T06:00:00');
-  const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-  const dia = dias[d.getDay()];
+  const dia = diaMX();
   const bloqueActual = getBloqueActual();
-  const ahora = new Date();
-  const horaActual = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+  const horaActual = horaMX();
 
   //Consexo catalogo
   const [grupos] = await db.query('SELECT id_grupo, nombre_grupo, semestre, area_estudio, turno FROM Grupos');
