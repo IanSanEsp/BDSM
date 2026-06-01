@@ -2,7 +2,7 @@ const MEXICO_OFFSET = 360; // UTC-6 en minutos
 
 export function toMexicoTime(date = new Date()) {
   const serverOffset = date.getTimezoneOffset();
-  const diffMin = MEXICO_OFFSET - serverOffset;
+  const diffMin = serverOffset - MEXICO_OFFSET;
   return new Date(date.getTime() + diffMin * 60000);
 }
 
