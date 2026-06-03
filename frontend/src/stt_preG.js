@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const token = getSessionToken();
     const u = getSessionUser();
     if (!token || !u?.id_usuario) {
-      alert('No hay sesión activa. Inicia sesión otra vez.');
+      mostrarTostada({ titulo: 'Error', mensaje: 'No hay sesión activa. Inicia sesión otra vez.', tipo: 'error' });
       clearSession();
       window.location.href = 'index.html';
       return;
@@ -169,18 +169,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const correo = String(editCorreoEl?.value || '').trim();
     const turno = String(editTurnoEl?.value || '').trim();
     if (!nombre || !correo || !turno) {
-      alert('Completa nombre, correo y turno');
+      mostrarTostada({ titulo: 'Aviso', mensaje: 'Completa nombre, correo y turno', tipo: 'advertencia' });
       return;
     }
 
     try {
-      const r = await fetchJson(`/usuarios/${encodeURIComponent(u.id_usuario)}`, {
+      const r = await fetchJson(`/usuarios/me`, {
         method: 'PUT',
         body: { nombre, correo, turno },
         auth: true
       });
       if (!r.ok) {
-        alert(r?.data?.error || `No se pudo guardar (HTTP ${r.status})`);
+        mostrarTostada({ titulo: 'Error', mensaje: r?.data?.error || `No se pudo guardar (HTTP ${r.status})`, tipo: 'error' });
         return;
       }
 
@@ -194,7 +194,45 @@ document.addEventListener('DOMContentLoaded', () => {
       btnEditar.textContent = 'Editar Información';
       modoEdicion = false;
     } catch {
-      alert('No se pudo conectar al backend');
+      mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo conectar al backend', tipo: 'error' });
+    }
+  });
+
+  // Cambio de contraseña
+  document.getElementById('btn-guardar-contrasena')?.addEventListener('click', async () => {
+    const actual = document.getElementById('edit-contrasena-actual')?.value || '';
+    const nueva = document.getElementById('edit-contrasena-nueva')?.value || '';
+    const confirmar = document.getElementById('edit-contrasena-confirmar')?.value || '';
+
+    if (!actual || !nueva || !confirmar) {
+      mostrarTostada({ titulo: 'Aviso', mensaje: 'Completa todos los campos de contraseña', tipo: 'advertencia' });
+      return;
+    }
+    if (nueva !== confirmar) {
+      mostrarTostada({ titulo: 'Error', mensaje: 'La nueva contraseña y la confirmación no coinciden', tipo: 'error' });
+      return;
+    }
+    if (nueva.length < 8) {
+      mostrarTostada({ titulo: 'Error', mensaje: 'La nueva contraseña debe tener al menos 8 caracteres', tipo: 'error' });
+      return;
+    }
+
+    try {
+      const r = await fetchJson('/usuarios/me', {
+        method: 'PUT',
+        body: { contrasena_actual: actual, contrasena_nueva: nueva },
+        auth: true
+      });
+      if (!r.ok) {
+        mostrarTostada({ titulo: 'Error', mensaje: r?.data?.error || 'No se pudo cambiar la contraseña', tipo: 'error' });
+        return;
+      }
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Contraseña actualizada correctamente', tipo: 'exito' });
+      document.getElementById('edit-contrasena-actual').value = '';
+      document.getElementById('edit-contrasena-nueva').value = '';
+      document.getElementById('edit-contrasena-confirmar').value = '';
+    } catch {
+      mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo conectar al backend', tipo: 'error' });
     }
   });
 });

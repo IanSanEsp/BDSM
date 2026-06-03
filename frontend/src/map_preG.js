@@ -21,6 +21,7 @@ let todosLosSalones = [];
 let salonSeleccionado = null;
 let filtrosActivos = { aulas: true, laboratorios: true };
 let busquedaActual = '';
+let busquedaActualPorKey = new Map();
 
 let zoom = 1;
 let panX = 0, panY = 0;
@@ -139,6 +140,7 @@ async function cargarOcupacionHorarioActual() {
     const data = await res.json();
     const rows = data && data.horarios ? data.horarios : (Array.isArray(data) ? data : []);
     const set = new Set();
+    const busquedaMap = new Map();
     for (const h of rows) {
       const gid = Number(h?.id_grupo);
       const startMin = timeToMinutes(h?.hora_inicio);
@@ -164,8 +166,23 @@ async function cargarOcupacionHorarioActual() {
         const key = keySalonName(k);
         if (key) set.add(key);
       }
+      const salonKey = keySalonName(nombre);
+      if (salonKey) {
+        const terms = [
+          String(h.nombre_grupo || ''),
+          String(h.nombre_profesor || ''),
+          String(h.materia || '')
+        ].filter(Boolean);
+        for (const t of terms) {
+          const lower = t.toLowerCase().trim();
+          if (!lower) continue;
+          if (!busquedaMap.has(lower)) busquedaMap.set(lower, new Set());
+          busquedaMap.get(lower).add(salonKey);
+        }
+      }
     }
     ocupadosHorarioKeys = set;
+    busquedaActualPorKey = busquedaMap;
   } catch {
     ocupadosHorarioKeys = new Set();
   }
@@ -352,8 +369,18 @@ function renderMapa() {
     const colorKey = COLORES[estado] ? estado : 'default';
     const color = COLORES[colorKey];
 
-    const resaltado = busquedaActual &&
-      salon.nombre.toLowerCase().includes(busquedaActual.toLowerCase());
+    let resaltado = false;
+    if (busquedaActual) {
+      const q = busquedaActual.toLowerCase();
+      if (salon.nombre.toLowerCase().includes(q)) {
+        resaltado = true;
+      } else {
+        const matchedKeys = busquedaActualPorKey?.get(q);
+        if (matchedKeys && matchedKeys.has(keySalonName(salon.nombre))) {
+          resaltado = true;
+        }
+      }
+    }
 
     const c = resaltado ? COLORES.resaltado : color;
 

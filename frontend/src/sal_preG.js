@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const token = getSessionToken();
         if (!token) {
-          alert('No hay sesión activa. Inicia sesión otra vez.');
+          mostrarTostada({ titulo: 'Error', mensaje: 'No hay sesión activa. Inicia sesión otra vez.', tipo: 'error' });
           return;
         }
 
@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
           renderizarListaSalones();
           renderizarIncidenciasWidget();
         } catch (err) {
-          alert(err?.message || 'No se pudo actualizar el estado');
+          mostrarTostada({ titulo: 'Error', mensaje: err?.message || 'No se pudo actualizar el estado', tipo: 'error' });
         }
       });
 
@@ -732,22 +732,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const botonKebab = document.getElementById('boton-kebab');
-  const menuKebab = document.getElementById('menu-kebab');
-  if (botonKebab && menuKebab) {
-    botonKebab.addEventListener('click', (e) => {
-      e.stopPropagation();
-      menuKebab.classList.toggle('activo');
-    });
-    const opcionFiltros = document.getElementById('opcion-filtros');
-    if (opcionFiltros) {
-      opcionFiltros.addEventListener('click', (e) => {
-        e.stopPropagation();
-        menuKebab.classList.remove('activo');
-        alert('Filtros (pendiente)');
-      });
-    }
-  }
   document.addEventListener('click', () => {
     document.querySelectorAll('.menu-desplegable.activo').forEach((m) => m.classList.remove('activo'));
   });

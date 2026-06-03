@@ -171,13 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  // Kebab
-  const botonKebab = document.getElementById('boton-kebab');
-  const menuKebab = document.getElementById('menu-kebab');
-  if (botonKebab && menuKebab) {
-    botonKebab.addEventListener('click', (e) => { e.stopPropagation(); menuKebab.classList.toggle('activo'); });
-    document.getElementById('opcion-filtros')?.addEventListener('click', (e) => { e.stopPropagation(); menuKebab.classList.remove('activo'); alert('Filtros (pendiente)'); });
-  }
   document.addEventListener('click', () => document.querySelectorAll('.menu-desplegable.activo').forEach(m => m.classList.remove('activo')));
 
   // Menú perfil
@@ -240,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       tdAcc.querySelector('.btn-mantenimiento').addEventListener('click', (e) => {
         e.stopPropagation(); menuK.classList.remove('activo');
-        alert(`Cambiando salón ${s.nombre_salon} a estado de mantenimiento (Simulación)`);
+        mostrarTostada({ titulo: 'Aviso', mensaje: `Cambiando salón ${s.nombre_salon} a estado de mantenimiento (Simulación)`, tipo: 'advertencia' });
       });
       tbody.appendChild(tr);
     });

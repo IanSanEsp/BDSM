@@ -606,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnMantenimiento.addEventListener('click', (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
-        alert(`Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`);
+        mostrarTostada({ titulo: 'Aviso', mensaje: `Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`, tipo: 'advertencia' });
       });
 
       listaSalonesContenedor.appendChild(tr);
@@ -633,11 +633,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const actualizarTablaHorarioModal = () => {
     if (!salonSeleccionado || !cuerpoTablaHorario) return;
-
     cuerpoTablaHorario.innerHTML = '';
-
     const ausMap = buildAusenciasMap();
-
     bloquesHorarios.forEach(bloque => {
       const dyn = buscarDinamicoEnBloque(salonSeleccionado.id_salon, diaSeleccionadoModal, bloque.id);
       const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
@@ -657,10 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${hFinal.nombre_profesor || '-'}</td>
         `;
       } else {
-        fila.innerHTML = `
-          <td><strong>${bloque.hora}</strong></td>
-          <td colspan="3" style="color: #9ca3af; font-style: italic;">Sin clase</td>
-        `;
+        fila.innerHTML = `<td><strong>${bloque.hora}</strong></td><td colspan="3" style="color:#9ca3af;font-style:italic;">Sin clase</td>`;
       }
       cuerpoTablaHorario.appendChild(fila);
     });
@@ -761,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const contexto = incContextoEl?.value || '';
       const profesorSeleccionado = incProfesorEl?.value || null;
 
-      if (!tipo) { alert('Selecciona un tipo de incidencia'); return; }
+      if (!tipo) { mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un tipo de incidencia', tipo: 'advertencia' }); return; }
 
       const incObj = { // lo que se enviaria al backend para registrar la incidencia, orita solo lo loguea en consola
         tipo,
@@ -773,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       console.log('Incidencia registrada (sim):', incObj);
-      alert('Incidencia registrada (simulación)');
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Incidencia registrada (simulación)', tipo: 'exito' });
       if (modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo');
       if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
     });

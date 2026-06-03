@@ -7,8 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="src/stt_preG.css">
+      <link rel="stylesheet" href="src/tostada.css">
   </head>
   <body>
+    <div id="tostada-contenedor"></div>
     <div id="aplicacion" class="contenedor-aplicacion">
       <aside class="barra-lateral">
         <div class="logo-contenedor">
@@ -168,19 +170,19 @@
             </h3>
             <div class="campo-contrasena">
               <label class="etiqueta-campo">Contraseña Actual</label>
-              <input type="password" class="input-perfil" placeholder="••••••••••••">
+              <input type="password" id="edit-contrasena-actual" class="input-perfil" placeholder="••••••••••••">
             </div>
             <div class="campos-contrasena-nuevas">
               <div class="campo-contrasena">
                 <label class="etiqueta-campo">Nueva Contraseña</label>
-                <input type="password" class="input-perfil" placeholder="••••••••••••">
+                <input type="password" id="edit-contrasena-nueva" class="input-perfil" placeholder="••••••••••••">
               </div>
               <div class="campo-contrasena">
                 <label class="etiqueta-campo">Confirmar</label>
-                <input type="password" class="input-perfil" placeholder="••••••••••••">
+                <input type="password" id="edit-contrasena-confirmar" class="input-perfil" placeholder="••••••••••••">
               </div>
             </div>
-            <button class="boton-guardar-contrasena">Guardar Cambios</button>
+            <button class="boton-guardar-contrasena" id="btn-guardar-contrasena">Guardar Cambios</button>
           </div>
 
         </div>
@@ -192,5 +194,6 @@
       </main>
     </div>
     <script type="module" src="src/stt_preP.js"></script>
+      <script src="src/tostada.js"></script>
   </body>
 </html>

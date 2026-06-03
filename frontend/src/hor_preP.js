@@ -1,5 +1,4 @@
 import { initSalonSelectorMap } from './sel_salon_map.js';
-import { DEFAULT_API_URL, resolveApiBase, getSessionToken, paintSessionHeader, getSessionUser } from './map_preG_shared.js';
 import { DEFAULT_API_URL, resolveApiBase, getSessionToken, paintSessionHeader, getSessionUser, getLocalDateISO } from './map_preG_shared.js';
 
 document.addEventListener('DOMContentLoaded', async () => { // namas checa el dom (algo algo w3school)
@@ -286,7 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       salones = [];
       horario_dinamico = [];
       ausencias_profesor = [];
-      alert('No se pudieron cargar los horarios desde el servidor.');
+      mostrarTostada({ titulo: 'Error', mensaje: 'No se pudieron cargar los horarios desde el servidor.', tipo: 'error' });
     }
   };
 
@@ -1353,11 +1352,11 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (btnConfirmarAdelanto) {
     btnConfirmarAdelanto.addEventListener('click', async () => {
       if (!adelantoPendiente) {
-        alert('No hay adelanto seleccionado.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'No hay adelanto seleccionado.', tipo: 'advertencia' });
         return;
       }
       if (!salonSeleccionadoAdelanto?.id_salon) {
-        alert('Selecciona un salón para el adelanto.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un salón para el adelanto.', tipo: 'advertencia' });
         return;
       }
 
@@ -1400,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         renderizarAlertas();
       } catch (err) {
         console.error(err);
-        alert(err?.message || 'Error registrando adelanto');
+        mostrarTostada({ titulo: 'Error', mensaje: err?.message || 'Error registrando adelanto', tipo: 'error' });
       } finally {
         btnConfirmarAdelanto.disabled = false;
       }
@@ -2506,7 +2505,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     formEditarHorario.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!horarioEditando?.id_horario_fijo_detalle) {
-        alert('No se pudo identificar el horario a editar.');
+        mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo identificar el horario a editar.', tipo: 'error' });
         return;
       }
 
@@ -2519,18 +2518,18 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const dia = document.getElementById('editar-dia')?.value;
 
       if (!idGrupo || !idMateria || !idProfesor) {
-        alert('Selecciona Grupo, Materia y Profesor antes de guardar.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona Grupo, Materia y Profesor antes de guardar.', tipo: 'advertencia' });
         return;
       }
 
       const bloque = inferBloqueHorarioExacto(horaInicio);
       if (!bloque) {
-        alert('La hora de inicio debe ser exactamente una franja (07:00, 08:00, ... 20:00).');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'La hora de inicio debe ser exactamente una franja (07:00, 08:00, ... 20:00).', tipo: 'advertencia' });
         return;
       }
 
       if (!salonSeleccionadoEditar) {
-        alert('Selecciona un salón antes de guardar.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un salón antes de guardar.', tipo: 'advertencia' });
         return;
       }
 
@@ -2563,14 +2562,14 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         }
 
         modalEditarHorario.classList.remove('activo');
-        alert('Horario actualizado correctamente');
+        mostrarTostada({ titulo: 'Éxito', mensaje: 'Horario actualizado correctamente', tipo: 'exito' });
       } catch (err) {
         const status = err?.status;
         const msg = err?.message || 'No se pudo actualizar el horario.';
         if (status === 401 || status === 403) {
-          alert(`Sin permisos (necesitas sesión admin): ${msg}`);
+          mostrarTostada({ titulo: 'Error', mensaje: `Sin permisos (necesitas sesión admin): ${msg}`, tipo: 'error' });
         } else {
-          alert(msg);
+          mostrarTostada({ titulo: 'Error', mensaje: msg, tipo: 'error' });
         }
       }
     });
@@ -2660,7 +2659,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       
       modalConfirmacion.classList.remove('activo');
       
-      alert('Los horarios han sido eliminados.');
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Los horarios han sido eliminados.', tipo: 'exito' });
     });
   }
   renderizarTabla();
@@ -2924,7 +2923,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (opcionImportarExcel) { // wenazo, chamba
     opcionImportarExcel.addEventListener('click', () => {
       menuNuevoRegistro.classList.remove('activo');
-      alert('Todavia no');
+      mostrarTostada({ titulo: 'Aviso', mensaje: 'Todavia no', tipo: 'advertencia' });
     });
   }
 
@@ -2964,12 +2963,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       e.preventDefault();
 
       if (!salonSeleccionadoRegistro?.id_salon) {
-        alert('Por favor selecciona un salón en el mapa antes de guardar.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Por favor selecciona un salón en el mapa antes de guardar.', tipo: 'advertencia' });
         return;
       }
 
       if (salonSelectorMapApi?.isSalonOcupadoEnRango?.(salonSeleccionadoRegistro?.numero_salon)) {
-        alert('Ese salón está OCUPADO en el rango seleccionado. Elige otro salón.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Ese salón está OCUPADO en el rango seleccionado. Elige otro salón.', tipo: 'advertencia' });
         return;
       }
       
@@ -2977,7 +2976,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       const horaFin = regHoraFinEl?.value;
       const bloque = inferBloqueHorario(horaInicio);
       if (!bloque) {
-        alert('La hora de inicio no cae en ningún bloque válido. Usa una hora dentro de 07:00–20:50.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'La hora de inicio no cae en ningún bloque válido. Usa una hora dentro de 07:00–20:50.', tipo: 'advertencia' });
         return;
       }
 
@@ -3004,7 +3003,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           renderizarAlertasFaltantes();
         }
 
-        alert('Horario registrado correctamente');
+        mostrarTostada({ titulo: 'Éxito', mensaje: 'Horario registrado correctamente', tipo: 'exito' });
         modalRegistro.classList.remove('activo');
         formRegistro.reset();
         resetBotonSalon();
@@ -3012,9 +3011,9 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         const status = err?.status;
         const msg = err?.message || 'No se pudo registrar el horario.';
         if (status === 401 || status === 403) {
-          alert(`Sin permisos (necesitas sesión admin): ${msg}`);
+          mostrarTostada({ titulo: 'Error', mensaje: `Sin permisos (necesitas sesión admin): ${msg}`, tipo: 'error' });
         } else {
-          alert(msg);
+          mostrarTostada({ titulo: 'Error', mensaje: msg, tipo: 'error' });
         }
       }
     });
@@ -3126,7 +3125,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (infoBotonAccion) {
     infoBotonAccion.addEventListener('click', () => {
       if (!horarioActualEnWidget) {
-        alert('No hay horario seleccionado'); // bugs be dammed (screwed me over like 50 times) SHOULDNT HAPPEN BTW
+        mostrarTostada({ titulo: 'Error', mensaje: 'No hay horario seleccionado', tipo: 'error' });
         return;
       }
       if (!modalRegistrarIncidencia) return;
@@ -3194,21 +3193,22 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         ? (incProfesorEl?.value || null)
         : (horarioActualEnWidget?.id_profesor != null ? String(horarioActualEnWidget.id_profesor) : null);
 
-      if (!tipo) { alert('Selecciona un tipo de incidencia'); return; }
+      if (!tipo) { mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un tipo de incidencia', tipo: 'advertencia' }); return; }
 
       if (!horarioActualEnWidget?.id_grupo) {
-        alert('No se pudo identificar el grupo del horario.');
+        mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo identificar el grupo del horario.', tipo: 'error' });
         return;
       }
       if (!horaRegistro) {
-        alert('Selecciona la hora de la incidencia.');
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona la hora de la incidencia.', tipo: 'advertencia' });
         return;
       }
       if (!profesorSeleccionado) {
-        alert(tipo === 'ausencia_profesor'
+        mostrarTostada({ titulo: 'Aviso', mensaje: tipo === 'ausencia_profesor'
           ? 'Selecciona el profesor ausente.'
-          : 'No se pudo identificar el profesor del horario.'
-        );
+          : 'No se pudo identificar el profesor del horario.',
+          tipo: 'advertencia'
+        });
         return;
       }
 
@@ -3272,16 +3272,16 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         renderizarAdelantos();
         renderizarTabla();
 
-        alert('Incidencia registrada');
+        mostrarTostada({ titulo: 'Éxito', mensaje: 'Incidencia registrada', tipo: 'exito' });
         modalRegistrarIncidencia.classList.remove('activo');
         formRegistrarIncidencia.reset();
       } catch (err) {
         const status = err?.status;
         const msg = err?.message || 'No se pudo registrar la incidencia.';
         if (status === 401 || status === 403) {
-          alert(`Sin permisos (necesitas sesión prefecto/admin): ${msg}`);
+          mostrarTostada({ titulo: 'Error', mensaje: `Sin permisos (necesitas sesión prefecto/admin): ${msg}`, tipo: 'error' });
         } else {
-          alert(msg);
+          mostrarTostada({ titulo: 'Error', mensaje: msg, tipo: 'error' });
         }
       }
     });

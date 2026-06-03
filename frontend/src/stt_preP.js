@@ -114,6 +114,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Cambio de contraseña
+  document.getElementById('btn-guardar-contrasena')?.addEventListener('click', async () => {
+    const actual = document.getElementById('edit-contrasena-actual')?.value || '';
+    const nueva = document.getElementById('edit-contrasena-nueva')?.value || '';
+    const confirmar = document.getElementById('edit-contrasena-confirmar')?.value || '';
+
+    if (!actual || !nueva || !confirmar) {
+      mostrarTostada({ titulo: 'Aviso', mensaje: 'Completa todos los campos de contraseña', tipo: 'advertencia' });
+      return;
+    }
+    if (nueva !== confirmar) {
+      mostrarTostada({ titulo: 'Error', mensaje: 'La nueva contraseña y la confirmación no coinciden', tipo: 'error' });
+      return;
+    }
+    if (nueva.length < 8) {
+      mostrarTostada({ titulo: 'Error', mensaje: 'La nueva contraseña debe tener al menos 8 caracteres', tipo: 'error' });
+      return;
+    }
+
+    try {
+      const r = await fetchJson('/usuarios/me', {
+        method: 'PUT',
+        body: { contrasena_actual: actual, contrasena_nueva: nueva },
+        auth: true
+      });
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Contraseña actualizada correctamente', tipo: 'exito' });
+      document.getElementById('edit-contrasena-actual').value = '';
+      document.getElementById('edit-contrasena-nueva').value = '';
+      document.getElementById('edit-contrasena-confirmar').value = '';
+    } catch (e) {
+      mostrarTostada({ titulo: 'Error', mensaje: e?.message || 'No se pudo cambiar la contraseña', tipo: 'error' });
+    }
+  });
+
   // Menu de perfil
   const perfilBtn = document.getElementById('perfil-usuario-btn');
   const menuPerfilUsuario = document.getElementById('menu-perfil-usuario');

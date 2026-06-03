@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnMantenimiento.addEventListener('click', (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
-        alert(`Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`);
+        mostrarTostada({ titulo: 'Aviso', mensaje: `Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`, tipo: 'advertencia' });
       });
 
       listaSalonesContenedor.appendChild(tr);
@@ -669,9 +669,9 @@ document.addEventListener('DOMContentLoaded', () => {
     formRegistrarIncidencia.addEventListener('submit', (e) => {
       e.preventDefault();
       const tipo = incTipoEl?.value || '';
-      if (!tipo) { alert('Selecciona un tipo de incidencia'); return; }
+      if (!tipo) { mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un tipo de incidencia', tipo: 'advertencia' }); return; }
       console.log('Incidencia registrada (sim):', { tipo, hora: incHoraEl?.value, contexto: incContextoEl?.value, creado_en: new Date().toISOString() });
-      alert('Incidencia registrada (simulación)');
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Incidencia registrada (simulación)', tipo: 'exito' });
       if (modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo');
       if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
     });

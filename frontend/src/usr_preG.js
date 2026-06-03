@@ -446,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     panelDetalle.querySelector('.boton-guardar')?.addEventListener('click', async () => {
       const token = getToken();
       if (!token) {
-        alert('No hay sesión (token). Inicia sesión para guardar cambios.');
+        mostrarTostada({ titulo: 'Error', mensaje: 'No hay sesión (token). Inicia sesión para guardar cambios.', tipo: 'error' });
         return;
       }
 
@@ -475,14 +475,14 @@ document.addEventListener('DOMContentLoaded', () => {
         auth: true
       });
       if (!r.ok) {
-        alert(r?.data?.error || 'No se pudo actualizar el usuario');
+        mostrarTostada({ titulo: 'Error', mensaje: r?.data?.error || 'No se pudo actualizar el usuario', tipo: 'error' });
         return;
       }
 
       if (nuevoRol === 'Prefecto de Piso' && nuevoPiso) {
         const pisoNum = Number(nuevoPiso);
         if (!Number.isFinite(pisoNum)) {
-          alert('Selecciona un piso válido');
+          mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un piso válido', tipo: 'advertencia' });
           return;
         }
         const r2 = await fetchJson(`/usuarios/${encodeURIComponent(u.id_usuario)}/asignar-piso`, {
@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!usuarioSeleccionado) return;
       const token = getToken();
       if (!token) {
-        alert('No hay sesión (token). Inicia sesión para eliminar usuarios.');
+        mostrarTostada({ titulo: 'Error', mensaje: 'No hay sesión (token). Inicia sesión para eliminar usuarios.', tipo: 'error' });
         return;
       }
 
@@ -524,10 +524,11 @@ document.addEventListener('DOMContentLoaded', () => {
         auth: true
       });
       if (!r.ok) {
-        alert(r?.data?.error || 'No se pudo eliminar el usuario');
+        mostrarTostada({ titulo: 'Error', mensaje: r?.data?.error || 'No se pudo eliminar el usuario', tipo: 'error' });
         return;
       }
 
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Usuario eliminado correctamente', tipo: 'exito' });
       usuarioSeleccionado = null;
       modoEdicion = false;
       await cargarUsuarios();
@@ -568,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   opcionImportarExcelUsr?.addEventListener('click', () => {
     menuNuevoRegistro?.classList.remove('activo');
-    alert('Importar Excel (pendiente)');
+    mostrarTostada({ titulo: 'Aviso', mensaje: 'Importar Excel (pendiente)', tipo: 'advertencia' });
   });
 
   // Registro manual modal
@@ -655,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (!r.ok) {
-        alert(r?.data?.error || 'No se pudo registrar el usuario');
+        mostrarTostada({ titulo: 'Error', mensaje: r?.data?.error || 'No se pudo registrar el usuario', tipo: 'error' });
         return;
       }
 
@@ -663,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tipo === 'Prefecto de Piso' && pisoVal && newId) {
         const pisoNum = Number(pisoVal);
         if (!Number.isFinite(pisoNum)) {
-          alert('Selecciona un piso válido');
+          mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un piso válido', tipo: 'advertencia' });
           return;
         }
         const r2 = await fetchJson(`/usuarios/${encodeURIComponent(newId)}/asignar-piso`, {

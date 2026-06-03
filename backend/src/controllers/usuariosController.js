@@ -310,9 +310,38 @@ export const actualizarMiPerfil = async (req, res) => {
     const id = Number(req.user.sub);
     if (!id) return res.status(401).json({ error: "No autenticado" });
 
-    const { nombre, correo, turno } = req.body || {};
+    const { nombre, correo, turno, contrasena_actual, contrasena_nueva } = req.body || {};
     const fields = [];
     const values = [];
+
+    // Cambio de contraseña: verificar actual y encriptar nueva
+    if (contrasena_actual !== undefined || contrasena_nueva !== undefined) {
+      if (!contrasena_actual || !contrasena_nueva) {
+        return res.status(400).json({ error: "Debes enviar contrasena_actual y contrasena_nueva" });
+      }
+      if (String(contrasena_nueva).length < 8) {
+        return res.status(400).json({ error: "La nueva contraseña debe tener al menos 8 caracteres" });
+      }
+
+      const [userRows] = await db.query(
+        "SELECT `contraseña` FROM Usuarios WHERE id_usuarios = ? LIMIT 1",
+        [id]
+      );
+      if (!userRows || userRows.length === 0) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      const ok = await bcrypt.compare(String(contrasena_actual), String(userRows[0].contraseña));
+      if (!ok) {
+        return res.status(401).json({ error: "La contraseña actual no es correcta" });
+      }
+
+      const saltRounds = Number(process.env.BCRYPT_COST || 10);
+      const safeRounds = Number.isFinite(saltRounds) && saltRounds >= 4 ? saltRounds : 10;
+      const hash = await bcrypt.hash(String(contrasena_nueva), safeRounds);
+      fields.push("`contraseña` = ?");
+      values.push(hash);
+    }
 
     if (nombre !== undefined) { fields.push("nombre = ?"); values.push(nombre); }
     if (correo !== undefined) {
@@ -425,6 +454,12 @@ export const eliminarUsuario = async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Falta id_usuario" });
+
+    // Eliminar registros relacionados primero para evitar FK constraints
+    await db.query("DELETE FROM Salones_Favoritos WHERE id_usuario = ?", [id]);
+    await db.query("DELETE FROM Grupos_Favoritos WHERE id_usuario = ?", [id]);
+    await db.query("DELETE FROM Prefectos WHERE id_prefecto = ?", [id]);
+    await db.query("DELETE FROM Profesores WHERE id_profesor = ?", [id]);
 
     const [result] = await db.query("DELETE FROM Usuarios WHERE id_usuarios = ?", [id]);
     if (!result || result.affectedRows === 0) {
