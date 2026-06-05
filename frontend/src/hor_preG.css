@@ -486,6 +486,26 @@ thead th:first-child {
   text-transform: uppercase;
 }
 
+.celda-horario.historial-compacto {
+  padding: 4px 6px;
+  min-height: 36px;
+  border-left-width: 3px;
+  border-radius: 2px;
+}
+.celda-horario.historial-compacto .materia-nombre {
+  font-size: 11px;
+}
+.celda-horario.historial-compacto .profesor-nombre {
+  font-size: 10px;
+  margin-top: 2px;
+}
+.celda-horario.historial-compacto .info-salon {
+  margin-top: 2px;
+}
+.celda-horario.historial-compacto .info-salon span {
+  font-size: 10px;
+}
+
 .rejilla-widgets {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1494,6 +1514,45 @@ footer {
 #modal-historial .modal-cuerpo {
   overflow-y: auto;
 }
+
+.historial-selectores {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid var(--color-superficie-alta);
+  position: sticky;
+  top: 0;
+  background: var(--color-fondo);
+  z-index: 2;
+}
+
+.historial-selectores select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6e8eb;
+  font-size: 0.85rem;
+  background: #fff;
+  min-width: 140px;
+}
+
+.historial-selectores .boton-primario {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #60003E;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.historial-selectores .boton-primario:hover {
+  background: #4a0030;
+}
+
+
 
 .salon-container-header {
   display: flex;

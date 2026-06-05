@@ -1919,135 +1919,189 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   const modalHorarios = document.getElementById('modal-horarios');
   const cerrarModalHorarios = document.getElementById('cerrar-modal-horarios');
   const contenedorHorariosJerarquico = document.getElementById('contenedor-horarios-jerarquico');
-  // ATENCION mierda de historial q como no le se al frontsito se lo deje a chopilot :D
-  const cuerpoHistorial = modalHistorial ? modalHistorial.querySelector('.modal-cuerpo') : null;
+  const historialCiclo = document.getElementById('historial-ciclo');
+  const historialMes = document.getElementById('historial-mes');
+  const historialDia = document.getElementById('historial-dia');
+  const historialMostrar = document.getElementById('historial-mostrar');
+  const historialContenido = document.getElementById('historial-contenido');
 
-  const renderizarHistorial = () => {
-    if (!cuerpoHistorial) return;
-    cuerpoHistorial.innerHTML = '';
+  const generarOpcionesCiclo = () => {
+    if (!historialCiclo) return;
+    const cy = new Date().getFullYear();
+    historialCiclo.innerHTML = '<option value="">-- Seleccionar Ciclo --</option>';
+    for (let y = cy - 2; y <= cy + 2; y++) {
+      const opt1 = document.createElement('option');
+      opt1.value = `${y}-2`;
+      opt1.textContent = `Ciclo ${y}-2 (Ene-Jun ${y})`;
+      historialCiclo.appendChild(opt1);
+      const opt2 = document.createElement('option');
+      opt2.value = `${y}-1`;
+      opt2.textContent = `Ciclo ${y}-1 (Jul-Dic ${y})`;
+      historialCiclo.appendChild(opt2);
+    }
+  };
 
-    if (!Array.isArray(horario_fijo) || horario_fijo.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'min-height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af;';
-      empty.textContent = 'Sin horarios.';
-      cuerpoHistorial.appendChild(empty);
+  const actualizarMeses = () => {
+    if (!historialMes) return;
+    historialMes.innerHTML = '<option value="">-- Seleccionar Mes --</option>';
+    historialDia.innerHTML = '<option value="">-- Seleccionar Día --</option>';
+    const cicloValue = historialCiclo.value;
+    if (!cicloValue) return;
+    const [yearStr, periodo] = cicloValue.split('-');
+    const year = Number(yearStr);
+    const meses = periodo === '2'
+      ? ['Enero','Febrero','Marzo','Abril','Mayo','Junio']
+      : ['Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const offset = periodo === '2' ? 0 : 6;
+    historialMes.disabled = true;
+    meses.forEach((label, i) => {
+      const opt = document.createElement('option');
+      opt.value = `${year}-${String(i + 1 + offset).padStart(2,'0')}`;
+      opt.textContent = label;
+      historialMes.appendChild(opt);
+    });
+    historialMes.disabled = false;
+  };
+
+  const actualizarDias = () => {
+    if (!historialDia) return;
+    historialDia.innerHTML = '<option value="">-- Seleccionar Día --</option>';
+    const mesValue = historialMes.value;
+    if (!mesValue) return;
+    const [yearStr, monthStr] = mesValue.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    historialDia.disabled = true;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month - 1, d);
+      const dow = date.getDay();
+      const opt = document.createElement('option');
+      opt.value = `${year}-${monthStr}-${String(d).padStart(2,'0')}`;
+      const diaSemana = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][dow];
+      opt.textContent = `${String(d).padStart(2,'0')} - ${diaSemana}`;
+      if (dow === 0 || dow === 6) opt.style.color = '#94a3b8';
+      historialDia.appendChild(opt);
+    }
+    historialDia.disabled = false;
+  };
+
+  const renderizarHistorialCompleto = (rows, ausencias, fecha) => {
+    const ausenteEnHora = (clase) => {
+      const pid = Number(clase?.id_profesor);
+      const gid = Number(clase?.id_grupo);
+      const horaIni = String(clase?.hora_inicio_temp || clase?.hora_inicio || '').slice(0,5);
+      if (!Number.isFinite(pid) || !Number.isFinite(gid) || !horaIni) return false;
+      return ausencias.some(a =>
+        normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
+        Number(a.id_profesor) === pid &&
+        Number(a.id_grupo) === gid &&
+        String(a.hora || '').slice(0,5) === horaIni
+      );
+    };
+    if (!rows.length) {
+      historialContenido.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:40px;">Sin datos para esta fecha</p>';
       return;
     }
-
-    const diasOrden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-    const dinamicosFecha = horario_dinamico.filter((h) => (h.fecha || fechaDinamica) === fechaDinamica);
-    const dinamicosPorDetalle = new Map(
-      dinamicosFecha.map((d) => [Number(d.id_horario_fijo_detalle), d])
-    );
-
-    const ausenciasDia = ausencias_profesor
-      .filter((a) => (a.fecha || fechaDinamica) === fechaDinamica)
-      .filter((a) => normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor');
-    const ausenciasPorGrupoTiempo = new Map();
-    for (const a of ausenciasDia) {
-      const gid = Number(a.id_grupo);
-      const mins = timeToMinutes(a.hora);
-      const pid = Number(a.id_profesor);
-      if (!Number.isFinite(gid) || mins === null || !Number.isFinite(pid)) continue;
-      if (!ausenciasPorGrupoTiempo.has(gid)) ausenciasPorGrupoTiempo.set(gid, new Map());
-      const map = ausenciasPorGrupoTiempo.get(gid);
-      if (!map.has(mins)) map.set(mins, new Set());
-      map.get(mins).add(pid);
-    }
-
-    const horarioCancelado = (h) => {
-      const gid = Number(h.id_grupo);
-      const mins = timeToMinutes(h.hora_inicio);
-      if (!Number.isFinite(gid) || mins === null) return false;
-      const map = ausenciasPorGrupoTiempo.get(gid);
-      if (!map) return false;
-      const absentSet = map.get(mins);
-      if (!absentSet) return false;
-      const req = [h.id_profesor, h.id_profesor_aux ?? h.id_auxiliar ?? null]
-        .map((x) => (x === null || x === undefined || x === '' ? null : Number(x)))
-        .filter((x) => Number.isFinite(x) && x > 0);
-      if (req.length === 0) return false;
-      return req.every((pid) => absentSet.has(pid));
-    };
-
-    const grupoPorId = new Map(grupos.map(g => [Number(g.id_grupo), g]));
-    const materiaPorId = new Map(materias.map(m => [Number(m.id_materia), m]));
-    const usuarioPorId = new Map(usuarios.map(u => [Number(u.id_usuarios), u]));
-    const salonPorId = new Map(salones.map(s => [Number(s.id_salon), s]));
-
-    diasOrden.forEach((dia) => {
-      const horariosDia = horario_fijo
-        .filter((h) => h.dia === dia)
-        .slice()
-        .sort((a, b) => (timeToMinutes(a.hora_inicio) ?? 0) - (timeToMinutes(b.hora_inicio) ?? 0));
-
-      if (horariosDia.length === 0) return;
-
-      const separador = document.createElement('div');
-      separador.className = 'separador-fecha';
-      separador.innerHTML = `<span class="fecha-etiqueta">${dia} • ${fechaDinamica}</span>`;
-      cuerpoHistorial.appendChild(separador);
-
-      horariosDia.forEach((h) => {
-        const grupo = grupoPorId.get(Number(h.id_grupo));
-        const materia = materiaPorId.get(Number(h.id_materia));
-        const profesor = usuarioPorId.get(Number(h.id_profesor));
-        const salon = salonPorId.get(Number(h.id_salon));
-
-        const dyn = dinamicosPorDetalle.get(Number(h.id_horario_fijo_detalle)) || null;
-        const cancelada = horarioCancelado(h);
-        const motivo = dyn?.motivo || dyn?.motivo_cambio || '';
-        const horaOrig = `${hhmm(h.hora_inicio)} - ${hhmm(h.hora_fin)}`;
-        const horaDyn = dyn ? `${hhmm(dyn.hora_inicio)} - ${hhmm(dyn.hora_fin)}` : null;
-        const salonDyn = dyn?.id_salon_temporal ? salonPorId.get(Number(dyn.id_salon_temporal)) : null;
-
-        const div = document.createElement('div');
-        div.className = 'tarjeta-alerta';
-
-        if (dyn) {
-          div.innerHTML = `
-            <div class="alerta-icono advertencia">
-              <span class="material-symbols-outlined md-20">warning</span>
-            </div>
-            <div class="alerta-texto">
-              <p>${motivo || 'Cambio/Adelanto'}</p>
-              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
-              <p>${horaOrig} → ${horaDyn}</p>
-              <p>Salón: ${salonDyn?.numero_salon || salonDyn?.nombre_salon || salon?.numero_salon || 'S/N'}</p>
-              ${cancelada ? '<p>Clase cancelada por ausencia.</p>' : ''}
-            </div>
-          `;
-        } else if (cancelada) {
-          div.innerHTML = `
-            <div class="alerta-icono error">
-              <span class="material-symbols-outlined md-20">person_off</span>
-            </div>
-            <div class="alerta-texto">
-              <p>Clase cancelada</p>
-              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
-              <p>${horaOrig}</p>
-              <p>Salón: ${salon?.numero_salon || 'S/N'}</p>
-            </div>
-          `;
-        } else {
-          div.innerHTML = `
-            <div class="alerta-icono exito">
-              <span class="material-symbols-outlined md-20">check_circle</span>
-            </div>
-            <div class="alerta-texto">
-              <p>Sin cambios</p>
-              <p>${grupo?.nombre_grupo || 'Grupo'} • ${materia?.nombre_materia || 'Materia'}</p>
-              <p>${horaOrig}</p>
-              <p>Salón: ${salon?.numero_salon || 'S/N'}</p>
-            </div>
-          `;
-        }
-
-        cuerpoHistorial.appendChild(div);
-      });
+    const gruposUnicos = [...new Set(rows.map(r => r.nombre_grupo))].filter(Boolean).sort();
+    const mapa = {};
+    rows.forEach(r => {
+      const g = r.nombre_grupo;
+      if (!g) return;
+      if (!mapa[g]) mapa[g] = [];
+      mapa[g].push(r);
     });
+    const htmlFilas = gruposUnicos.map(grupo => {
+      const items = mapa[grupo];
+      return `<tr>
+        <td class="columna-grupo">${grupo}</td>
+        ${franjasHorarias.map((hora, idx) => {
+          const clase = items.find(r => {
+            const ini = r.hora_inicio_temp || r.hora_inicio;
+            const fin = r.hora_fin_temp || r.hora_fin;
+            return ini && fin && timeToMinutes(ini) <= timeToMinutes(hora) && timeToMinutes(fin) > timeToMinutes(hora);
+          });
+          if (!clase) {
+            return '<td><div class="celda-vacia" style="min-height:36px;"></div></td>';
+          }
+          if (idx > 0) {
+            const prev = items.find(r => {
+              const ini = r.hora_inicio_temp || r.hora_inicio;
+              const fin = r.hora_fin_temp || r.hora_fin;
+              return ini && fin && timeToMinutes(ini) <= timeToMinutes(franjasHorarias[idx - 1]) && timeToMinutes(fin) > timeToMinutes(franjasHorarias[idx - 1]);
+            });
+            if (prev === clase) return '';
+          }
+          const hInicio = String(clase.hora_inicio_temp || clase.hora_inicio || '').slice(0,5);
+          const hFin = String(clase.hora_fin_temp || clase.hora_fin || '').slice(0,5);
+          let numBloques = 1;
+          const iniMin = timeToMinutes(hInicio);
+          const finMin = timeToMinutes(hFin);
+          if (iniMin !== null && finMin !== null && finMin > iniMin) {
+            numBloques = Math.max(1, Math.ceil((finMin - iniMin) / 60));
+          }
+          const tieneDinamico = !!clase.id_horario_dinamico;
+          const esAusente = ausenteEnHora(clase);
+          let claseColor = 'celda-exito';
+          if (esAusente) claseColor = 'celda-error';
+          else if (tieneDinamico) claseColor = 'celda-advertencia';
+          const colSpan = numBloques > 1 ? ` colspan="${numBloques}"` : '';
+          return `<td${colSpan}>
+            <div class="celda-horario ${claseColor} historial-compacto">
+              <p class="materia-nombre">${clase.materia || '-'}</p>
+              <p class="profesor-nombre">${esAusente ? 'INSASISTENCIA' : (clase.nombre_profesor || '-')}</p>
+              <div class="info-salon">
+                <span class="material-symbols-outlined md-18">location_on</span>
+                <span>${clase.nombre_salon_temporal || clase.nombre_salon || ''}</span>
+              </div>
+            </div>
+          </td>`;
+        }).filter(Boolean).join('')}
+      </tr>`;
+    }).join('');
+    historialContenido.innerHTML = `
+      <div class="tabla-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="min-width:90px;">Grupo</th>
+              ${franjasHorarias.map(h => `<th>${h.slice(0,5)} - ${String(Number(h.slice(0,2)) + 1).padStart(2,'0')}:50</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${htmlFilas}</tbody>
+        </table>
+      </div>`;
   };
-  // ACA acaba la cosa esta del historial (gracias papá chopilot)
+
+  const cargarHistorial = async () => {
+    const fecha = historialDia.value;
+    if (!fecha) return;
+    const cicloValue = historialCiclo.value;
+    const periodo = cicloValue ? cicloValue.split('-')[1] : null;
+    const semestresPermitidos = periodo === '2' ? [2, 4, 6] : periodo === '1' ? [1, 3, 5] : null;
+    historialContenido.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:40px;">Cargando...</p>';
+    try {
+      const [res, ausRes] = await Promise.all([
+        fetchJson(`/horarios/tabla-dinamica?fecha=${encodeURIComponent(fecha)}`, { auth: true }),
+        fetchJson(`/ausencias?fecha=${encodeURIComponent(fecha)}`, { auth: true }).catch(() => ({ ausencias: [] }))
+      ]);
+      let rows = res?.tabla || [];
+      const ausencias = ausRes?.ausencias || [];
+      if (semestresPermitidos) {
+        rows = rows.filter(r => !r.semestre || semestresPermitidos.includes(Number(r.semestre)));
+      }
+      renderizarHistorialCompleto(rows, ausencias, fecha);
+    } catch {
+      historialContenido.innerHTML = '<p style="text-align:center;color:#dc2626;padding:40px;">Error de conexión</p>';
+    }
+  };
+
+  if (historialCiclo) {
+    generarOpcionesCiclo();
+    historialCiclo.addEventListener('change', actualizarMeses);
+  }
+  if (historialMes) historialMes.addEventListener('change', actualizarDias);
+  if (historialMostrar) historialMostrar.addEventListener('click', cargarHistorial);
 
   // Renderizar
   const renderizarHorariosJerarquico = () => {
@@ -2629,7 +2683,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     opcionHistorial.addEventListener('click', (e) => {
       e.stopPropagation();
       menuKebab.classList.remove('activo');
-      renderizarHistorial();
       modalHistorial.classList.add('activo');
     });
   }

@@ -585,10 +585,19 @@
           </button>
         </div>
         <div class="modal-cuerpo">
-          <!-- Contenido del historial (vacio por ahora) -->
-          <div style="min-height: 200px; display:flex; align-items:center; justify-content:center; color:#9ca3af;">
-            Historial
+          <div class="historial-selectores">
+            <select id="historial-ciclo">
+              <option value="">-- Seleccionar Ciclo --</option>
+            </select>
+            <select id="historial-mes">
+              <option value="">-- Seleccionar Mes --</option>
+            </select>
+            <select id="historial-dia">
+              <option value="">-- Seleccionar Día --</option>
+            </select>
+            <button id="historial-mostrar" class="boton-primario">Mostrar</button>
           </div>
+          <div id="historial-contenido" style="min-height:200px;"></div>
         </div>
       </div>
     </div>

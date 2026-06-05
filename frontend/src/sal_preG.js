@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const start = parseTimeToMinutes(horaInicio);
     const end = parseTimeToMinutes(horaFin);
     if (start === null || end === null) return [];
-    // usar [start, end) para no “comerse” el bloque siguiente cuando termina exacto
+    // usar [start, end) para no comerse el bloque siguiente cuando termina exacto (te odio fate)
     return BLOQUES_INTERVALOS.filter((b) => start < b.endMin && end > b.startMin).map((b) => b.id);
   }
 

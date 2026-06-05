@@ -314,7 +314,7 @@ export const actualizarMiPerfil = async (req, res) => {
     const fields = [];
     const values = [];
 
-    // Cambio de contraseña: verificar actual y encriptar nueva
+    // Cambio de contraseña verificar actual y encriptar
     if (contrasena_actual !== undefined || contrasena_nueva !== undefined) {
       if (!contrasena_actual || !contrasena_nueva) {
         return res.status(400).json({ error: "Debes enviar contrasena_actual y contrasena_nueva" });
@@ -455,7 +455,7 @@ export const eliminarUsuario = async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Falta id_usuario" });
 
-    // Eliminar registros relacionados primero para evitar FK constraints
+    // Eliminar registros relacionados para evitar FK constraints
     await db.query("DELETE FROM Salones_Favoritos WHERE id_usuario = ?", [id]);
     await db.query("DELETE FROM Grupos_Favoritos WHERE id_usuario = ?", [id]);
     await db.query("DELETE FROM Prefectos WHERE id_prefecto = ?", [id]);
