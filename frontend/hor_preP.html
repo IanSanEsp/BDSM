@@ -353,6 +353,7 @@
                 <option value="ausencia_profesor">Ausencia - Profesor</option>
                 <option value="junta">Junta Académica</option>
                 <option value="excursion">Excursión</option>
+                <option value="reasignacion_salon">Reasignar Salón</option>
                 <option value="otro">Otro</option>
               </select>
             </div>
@@ -363,6 +364,10 @@
             <div class="campo-formulario oculto" id="inc-hora-container">
               <label>Hora (registro)</label>
               <input type="time" id="inc-hora">
+            </div>
+            <div class="campo-formulario oculto" id="inc-salon-container">
+              <label>Nuevo Salón</label>
+              <button type="button" id="inc-salon-btn" class="salon-selector-btn">Salón: —</button>
             </div>
             <div class="acciones-incidencia" style="margin-top:8px;">
               <button type="button" id="btn-codigo-qr" class="boton-secundario oculto">Código QR</button>
@@ -422,23 +427,37 @@
 
     <!-- Modal Confirmar Adelanto -->
     <div id="modal-confirmar-adelanto" class="modal-overlay">
-      <div class="modal-contenido modal-grande" style="max-width:420px;">
+      <div class="modal-contenido modal-grande" style="max-width:520px;">
         <div class="modal-cabecera">
-          <h2>Confirmar Adelanto</h2>
+          <h2>Adelantar Clase</h2>
           <button id="cerrar-modal-confirmar-adelanto" class="boton-icono">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
         <div class="modal-cuerpo">
-          <form class="formulario-registro" id="form-confirmar-adelanto">
-            <div class="campo-formulario">
-              <p style="margin-bottom:4px;">¿Deseas confirmar este adelanto?</p>
+          <div id="info-adelanto-clase" style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:0.85rem;"></div>
+          <div class="campo-formulario">
+            <label>Nuevo horario</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <select id="adelanto-hora-inicio" class="selector-hora" style="flex:1;padding:8px;border:1px solid #e6e8eb;border-radius:8px;">
+                <option value="">-- Hora inicio --</option>
+              </select>
+              <select id="adelanto-hora-fin" class="selector-hora" style="flex:1;padding:8px;border:1px solid #e6e8eb;border-radius:8px;">
+                <option value="">-- Hora fin --</option>
+              </select>
             </div>
-            <div class="modal-acciones" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-              <button type="button" id="cancelar-adelanto" class="boton-secundario">Cancelar</button>
-              <button type="button" id="confirmar-adelanto" class="boton-primario">Confirmar</button>
-            </div>
-          </form>
+          </div>
+          <div class="campo-formulario" style="margin-top:12px;">
+            <label>Salón</label>
+            <button type="button" id="adelanto-salon-btn" class="boton-secundario" style="width:100%;margin-top:4px;display:flex;align-items:center;gap:8px;justify-content:center;" disabled>
+              <span class="material-symbols-outlined md-18">location_on</span>
+              <span>Seleccionar salón</span>
+            </button>
+          </div>
+          <div class="modal-acciones" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="cancelar-adelanto" class="boton-secundario">Cancelar</button>
+            <button type="button" id="confirmar-adelanto" class="boton-primario" disabled>Confirmar Adelanto</button>
+          </div>
         </div>
       </div>
     </div>

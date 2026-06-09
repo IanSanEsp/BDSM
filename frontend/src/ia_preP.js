@@ -144,70 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn.addEventListener('click', enviarMensaje);
   }
 
-  const convDropdown = document.createElement('div');
-  convDropdown.className = 'menu-desplegable conv-kebab-dropdown';
-  convDropdown.innerHTML = `
-    <button class="opcion-menu" id="kebab-renombrar">
-      <span class="material-symbols-outlined md-18">edit</span>
-      <span>Renombrar</span>
-    </button>
-    <button class="opcion-menu" id="kebab-eliminar">
-      <span class="material-symbols-outlined md-18">delete</span>
-      <span>Eliminar</span>
-    </button>
-  `;
-  document.body.appendChild(convDropdown);
-
-  let convItemActivo = null;
-
-  document.getElementById('conv-lista')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.conv-menu-btn');
-    if (!btn) return;
-    e.stopPropagation();
-
-    const item = btn.closest('.conv-item');
-    if (convDropdown.classList.contains('activo') && convItemActivo === item) {
-      convDropdown.classList.remove('activo');
-      convItemActivo = null;
-      return;
-    }
-
-    convItemActivo = item;
-    const rect = btn.getBoundingClientRect();
-    convDropdown.style.top = `${rect.bottom + window.scrollY + 4}px`;
-    convDropdown.style.left = `${rect.right + window.scrollX - convDropdown.offsetWidth || rect.left}px`;
-    convDropdown.classList.add('activo');
-
-    requestAnimationFrame(() => {
-      const dw = convDropdown.offsetWidth;
-      convDropdown.style.left = `${rect.right + window.scrollX - dw}px`;
-    });
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.conv-kebab-dropdown') && !e.target.closest('.conv-menu-btn')) {
-      convDropdown.classList.remove('activo');
-      convItemActivo = null;
-    }
-  });
-
-  document.getElementById('kebab-renombrar')?.addEventListener('click', () => {
-    if (!convItemActivo) return;
-    const titulo = convItemActivo.querySelector('.conv-titulo');
-    if (!titulo) return;
-    const nuevoNombre = prompt('Nuevo nombre:', titulo.textContent);
-    if (nuevoNombre?.trim()) titulo.textContent = nuevoNombre.trim();
-    convDropdown.classList.remove('activo');
-    convItemActivo = null;
-  });
-
-  document.getElementById('kebab-eliminar')?.addEventListener('click', () => {
-    if (!convItemActivo) return;
-    convItemActivo.remove();
-    convDropdown.classList.remove('activo');
-    convItemActivo = null;
-  });
-
   const perfilBtn = document.getElementById('perfil-usuario-btn');
   const menuPerfilUsuario = document.getElementById('menu-perfil-usuario');
   if (perfilBtn && menuPerfilUsuario) {
@@ -221,10 +157,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('opcion-perfil')?.addEventListener('click', () => { window.location.href = 'stt_preP.html'; });
   document.getElementById('opcion-cerrar-sesion')?.addEventListener('click', () => { clearSession(); window.location.href = 'index.html'; });
-
-  document.getElementById('btn-nueva-consulta')?.addEventListener('click', () => {
-    sesionActiva = null;
-    mostrarBienvenida();
-    chatInput?.focus();
-  });
 });

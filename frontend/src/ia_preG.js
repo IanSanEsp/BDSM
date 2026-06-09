@@ -82,16 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
     div.className = 'mensaje mensaje-bienvenida';
     div.innerHTML = `
       <div class="bienvenida-contenido">
-        <h2>👋 ¡Hola! Soy sIAmon</h2>
-        <p>Puedes preguntarme sobre:</p>
+        <h2>Hola Soy sIAmon</h2>
+        <p>Puedes preguntarme cosas sobre:</p>
         <ul>
-          <li>📋 Horarios de grupos, profesores o salones</li>
-          <li>✅ Salones disponibles ahora</li>
-          <li>📊 Ocupación de pisos</li>
-          <li>⚠️ Incidencias del día</li>
-          <li>💡 Sugerencias para reasignar salones</li>
+          <li>● Horarios de grupos, profesores o salones</li>
+          <li>● Salones disponibles ahora</li>
+          <li>● Ocupación de pisos</li>
+          <li>● Incidencias del día</li>
+          <li>● Sugerencias para reasignar salones</li>
         </ul>
-        <p class="bienvenida-ejemplo"><em>Ej: "¿Qué salones hay libres en el piso 3?"</em></p>
+        <p class="bienvenida-ejemplo"><em>Ej: "Qué salones hay libres en el piso 3?"</em></p>
       </div>
     `;
     chatContainer.appendChild(div);
@@ -156,9 +156,4 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('opcion-perfil')?.addEventListener('click', () => { window.location.href = 'stt_preG.html'; });
   document.getElementById('opcion-cerrar-sesion')?.addEventListener('click', () => { clearSession(); window.location.href = 'index.html'; });
 
-  document.getElementById('btn-nueva-consulta')?.addEventListener('click', () => {
-    sesionActiva = null;
-    mostrarBienvenida();
-    chatInput.focus();
-  });
 });

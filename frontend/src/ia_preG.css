@@ -206,113 +206,6 @@ body {
   overflow: hidden;
 }
 
-.panel-conversaciones {
-  width: 280px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  background-color: white;
-  border-right: 1px solid var(--color-superficie-alta);
-  overflow: hidden;
-}
-
-.conv-header {
-  padding: 20px 20px 12px;
-  flex: none;
-}
-
-.conv-header-titulo {
-  font-size: 10px;
-  font-weight: 700;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.conv-lista {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 8px;
-}
-
-.conv-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin-bottom: 2px;
-}
-
-.conv-item:hover { background: var(--color-superficie); }
-
-.conv-item.activo {
-  background: white;
-  border: 1px solid var(--color-superficie-alta);
-  box-shadow: var(--sombra-sm);
-}
-
-.conv-info { flex: 1; min-width: 0; }
-
-.conv-titulo {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.conv-fecha {
-  font-size: 0.6875rem;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-
-.conv-menu-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #9ca3af;
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border-radius: 4px;
-  flex: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.conv-item:hover .conv-menu-btn,
-.conv-item.activo .conv-menu-btn { opacity: 1; }
-.conv-menu-btn:hover { color: #374151; }
-
-.conv-footer {
-  padding: 16px;
-  flex: none;
-  border-top: 1px solid var(--color-superficie-alta);
-}
-
-.btn-nueva-consulta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px;
-  background-color: var(--color-primario-oscuro);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: Inter, sans-serif;
-}
-.btn-nueva-consulta:hover { background-color: var(--color-primario); }
-
 /* Chat panel */
 .panel-chat {
   flex: 1;
@@ -500,13 +393,6 @@ body {
   background-color: #E8E8E8;
   color: #6b7280;
 }
-
-/* Kebab dropdown for conversations */
-.conv-kebab-dropdown {
-  position: absolute;
-  z-index: 200;
-}
-.conv-kebab-dropdown.activo { display: block; }
 
 /* ── Footer ── */
 footer {

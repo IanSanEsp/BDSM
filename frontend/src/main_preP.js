@@ -537,10 +537,26 @@ document.addEventListener('DOMContentLoaded', () => {
         abrirModalIncidencia(salon, horarioActual);
       });
 
-      btnMantenimiento.addEventListener('click', (e) => {
+      btnMantenimiento.addEventListener('click', async (e) => {
         e.stopPropagation();
         menuKebab.classList.remove('activo');
-        mostrarTostada({ titulo: 'Aviso', mensaje: `Cambiando salón ${nombreSalon} a estado de mantenimiento (Simulación)`, tipo: 'advertencia' });
+        const actual = String(salon.estado || 'Disponible');
+        const nuevoEstado = actual === 'En Mantenimiento' ? 'Disponible' : 'En Mantenimiento';
+        try {
+          await fetchJson(`/salones/${salon.id_salon}`, {
+            method: 'PUT',
+            body: { estado: nuevoEstado },
+            auth: true
+          });
+          salon.estado = nuevoEstado;
+          renderizarSalones();
+          renderizarEstadisticas();
+          renderizarAlertas();
+          actualizarMapaPreview();
+          mostrarTostada({ titulo: 'Éxito', mensaje: `Salón ${nombreSalon} ahora está "${nuevoEstado}"`, tipo: 'exito' });
+        } catch (err) {
+          mostrarTostada({ titulo: 'Error', mensaje: err?.message || 'No se pudo actualizar el estado', tipo: 'error' });
+        }
       });
 
       listaSalonesContenedor.appendChild(tr);
@@ -623,6 +639,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const incContextoEl = document.getElementById('inc-contexto');
   const incProfesorContainer = document.getElementById('inc-profesor-container');
   const incProfesorEl = document.getElementById('inc-profesor');
+  const incSalonContainer = document.getElementById('inc-salon-container');
+  const incSalonSelect = document.getElementById('inc-salon-select');
   let horarioActualEnWidget = null;
 
   const abrirModalIncidencia = (salon, horario) => {
@@ -656,24 +674,130 @@ document.addEventListener('DOMContentLoaded', () => {
       if (v === 'ausencia_profesor') {
         if (incHoraContainer) incHoraContainer.classList.remove('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.remove('oculto');
+        if (incSalonContainer) incSalonContainer.classList.add('oculto');
         if (btnQr) btnQr.classList.remove('oculto');
+      } else if (v === 'reasignacion_salon') {
+        if (incHoraContainer) incHoraContainer.classList.add('oculto');
+        if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
+        if (btnQr) btnQr.classList.add('oculto');
+        if (incSalonSelect && salonesData) {
+          incSalonSelect.innerHTML = '<option value="">Seleccionar Salón</option>';
+          const salonActualId = Number(horarioActualEnWidget?.id_salon);
+          salonesData.forEach(s => {
+            if (Number(s.id_salon) === salonActualId) return;
+            const o = document.createElement('option');
+            o.value = Number(s.id_salon);
+            o.textContent = s.nombre_salon || `Salón ${s.id_salon}`;
+            incSalonSelect.appendChild(o);
+          });
+        }
+        if (incSalonContainer) incSalonContainer.classList.remove('oculto');
       } else {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
+        if (incSalonContainer) incSalonContainer.classList.add('oculto');
         if (btnQr) btnQr.classList.add('oculto');
       }
     });
   }
 
   if (formRegistrarIncidencia) {
-    formRegistrarIncidencia.addEventListener('submit', (e) => {
+    formRegistrarIncidencia.addEventListener('submit', async (e) => {
       e.preventDefault();
       const tipo = incTipoEl?.value || '';
+      const horaRegistro = incHoraEl?.value || null;
+      const profesorSeleccionado = incProfesorEl?.value || null;
+
       if (!tipo) { mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona un tipo de incidencia', tipo: 'advertencia' }); return; }
-      console.log('Incidencia registrada (sim):', { tipo, hora: incHoraEl?.value, contexto: incContextoEl?.value, creado_en: new Date().toISOString() });
-      mostrarTostada({ titulo: 'Éxito', mensaje: 'Incidencia registrada (simulación)', tipo: 'exito' });
-      if (modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo');
-      if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
+      if (!horarioActualEnWidget?.id_grupo && tipo !== 'reasignacion_salon') {
+        mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo identificar el grupo del horario.', tipo: 'error' });
+        return;
+      }
+
+      if (tipo === 'reasignacion_salon') {
+        const idSalonNuevo = Number(incSalonSelect?.value);
+        if (!idSalonNuevo || !horarioActualEnWidget?.id_horario_fijo_detalle) {
+          mostrarTostada({ titulo: 'Aviso', mensaje: idSalonNuevo ? 'No se pudo identificar la clase.' : 'Selecciona un salón de destino.', tipo: 'advertencia' });
+          return;
+        }
+        try {
+          await fetchJson(`/horarios/${horarioActualEnWidget.id_horario_fijo_detalle}/reasignar-salon`, {
+            method: 'POST',
+            auth: true,
+            body: { fecha: hoyISO(), id_salon_temporal: idSalonNuevo }
+          });
+          const fecha = hoyISO();
+          const [salonesRes, dinamicaRes] = await Promise.all([
+            fetchJson('/salones', {}),
+            fetchJson(`/horarios/tabla-dinamica?fecha=${encodeURIComponent(fecha)}`, { auth: true })
+          ]);
+          salonesData = Array.isArray(salonesRes) ? salonesRes : (salonesRes?.salones || []);
+          dinamicaData = dinamicaRes?.tabla || [];
+          renderizarSalones();
+          renderizarAlertas();
+          renderizarEstadisticas();
+          actualizarMapaPreview();
+          mostrarTostada({ titulo: 'Éxito', mensaje: 'Salón reasignado correctamente.', tipo: 'exito' });
+          modalRegistrarIncidencia.classList.remove('activo');
+          formRegistrarIncidencia.reset();
+        } catch (err) {
+          const msg = err?.message || 'No se pudo reasignar el salón.';
+          if (err?.status === 409) {
+            mostrarTostada({ titulo: 'Conflicto', mensaje: 'El salón ya tiene horario en ese bloque.', tipo: 'error' });
+          } else if (err?.status === 401 || err?.status === 403) {
+            mostrarTostada({ titulo: 'Error', mensaje: `Sin permisos: ${msg}`, tipo: 'error' });
+          } else {
+            mostrarTostada({ titulo: 'Error', mensaje: msg, tipo: 'error' });
+          }
+        }
+        return;
+      }
+
+      if (!horaRegistro) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona la hora de la incidencia.', tipo: 'advertencia' });
+        return;
+      }
+      if (!profesorSeleccionado) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Selecciona el profesor ausente.', tipo: 'advertencia' });
+        return;
+      }
+
+      try {
+        await fetchJson('/ausencias', {
+          method: 'POST',
+          auth: true,
+          body: {
+            fecha: hoyISO(),
+            hora: horaRegistro,
+            id_profesor: Number(profesorSeleccionado),
+            id_grupo: Number(horarioActualEnWidget.id_grupo),
+            accion_tomada: tipo
+          }
+        });
+
+        ausenciasData.push({
+          fecha: hoyISO(),
+          hora: horaRegistro,
+          id_profesor: Number(profesorSeleccionado),
+          id_grupo: Number(horarioActualEnWidget.id_grupo),
+          accion_tomada: tipo
+        });
+
+        renderizarSalones();
+        renderizarAlertas();
+        renderizarEstadisticas();
+
+        mostrarTostada({ titulo: 'Éxito', mensaje: 'Incidencia registrada', tipo: 'exito' });
+        modalRegistrarIncidencia.classList.remove('activo');
+        formRegistrarIncidencia.reset();
+      } catch (err) {
+        const msg = err?.message || 'No se pudo registrar la incidencia.';
+        if (err?.status === 401 || err?.status === 403) {
+          mostrarTostada({ titulo: 'Error', mensaje: `Sin permisos: ${msg}`, tipo: 'error' });
+        } else {
+          mostrarTostada({ titulo: 'Error', mensaje: msg, tipo: 'error' });
+        }
+      }
     });
   }
 

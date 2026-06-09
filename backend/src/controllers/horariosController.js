@@ -659,6 +659,18 @@ export const reasignarSalon = async (req, res) => {
       ]
     );
 
+    // También registrar como incidencia
+    const [gRows] = await db.query(
+      "SELECT id_grupo FROM horarios WHERE id_horario_fijo = ? LIMIT 1",
+      [hf.id_horario_fijo]
+    );
+    const idGrupo = gRows && gRows[0] ? gRows[0].id_grupo : null;
+    await db.query(
+      `INSERT INTO Incidencias (fecha, hora, id_profesor, id_grupo, accion_tomada)
+       VALUES (?, ?, ?, ?, ?)`,
+      [fecha, hi.slice(0,5), hf.id_profesor, idGrupo, "reasignacion_salon"]
+    );
+
     const [nuevo] = await db.query("SELECT * FROM Horario_Dinamico WHERE id_horario_dinamico = ? LIMIT 1", [ins.insertId]);
     return res.status(201).json({ message: "Reasignación registrada", horario_dinamico: nuevo && nuevo[0] ? nuevo[0] : null });
   } catch (err) {
