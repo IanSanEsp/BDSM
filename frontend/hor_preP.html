@@ -364,31 +364,19 @@
             </div>
             <div class="campo-formulario oculto" id="inc-hora-container">
               <label>Hora (registro)</label>
-              <input type="time" id="inc-hora">
+              <select id="inc-hora">
+                <option value="">Seleccionar hora</option>
+              </select>
             </div>
             <div class="campo-formulario oculto" id="inc-salon-container">
               <label>Nuevo Salón</label>
               <button type="button" id="inc-salon-btn" class="salon-selector-btn">Salón: —</button>
             </div>
             <div class="acciones-incidencia" style="margin-top:8px;">
-              <button type="button" id="btn-codigo-qr" class="boton-secundario oculto">Código QR</button>
               <button type="submit" class="boton-registro">Registrar Incidencia</button>
             </div>
           </form>
         </div>
-      </div>
-    </div>
-
-    <!-- Modal Codigo QR -->
-    <div id="modal-codigo-qr" class="modal-overlay">
-      <div class="modal-contenido modal-grande" style="max-width:380px;">
-        <div class="modal-cabecera">
-          <h2>Código QR</h2>
-          <button id="cerrar-modal-codigo-qr" class="boton-icono">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="modal-cuerpo" id="cuerpo-modal-codigo-qr"></div>
       </div>
     </div>
 
@@ -490,7 +478,7 @@
       </div>
     </div>
 
-    <script type="module" src="src/hor_preP.js"></script>
+    <script type="module" src="src/hor_preP.js?v=2026-06-15-5"></script>
       <script src="src/tostada.js"></script>
   </body>
 </html>

@@ -1,9 +1,12 @@
 import express from "express";
 import multer from "multer";
-import { exportHorarios, importHorarios, importFullDb } from "../controllers/importExportController.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { exportHorarios, importHorarios, importFullDb, importarExcelHorarios } from "../controllers/importExportController.js";
+import { requireAuth, requireAdmin, requirePrefecto } from "../middleware/auth.js";
 
 const router = express.Router();
+
+// Multer en memoria para el import de horarios por Excel
+const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const upload = multer({
   dest: 'uploads/', // directorio temporal
@@ -25,5 +28,8 @@ router.post("/import/horarios", requireAuth, requireAdmin, upload.single('excel'
 
 // Alias explícito por si pruebas
 router.post("/import/full", requireAuth, requireAdmin, upload.single('excel'), importFullDb);
+
+// Importar horarios desde Excel (esquema Horario_Fijo + horarios) — para prefectos
+router.post("/import/horarios-excel", requireAuth, requirePrefecto, uploadMem.single('archivo'), importarExcelHorarios);
 
 export default router;

@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tipo === 'sIAmon' && source) {
       const badge = document.createElement('span');
       badge.className = `source-badge ${source === 'gemini' ? 'gemini' : 'fallback'}`;
-      badge.textContent = source === 'gemini' ? '✨ IA' : '⚙️ Base de datos';
+      badge.textContent = source === 'gemini' ? 'sAlmon' : '⚙️ Base de datos';
       contenido.appendChild(document.createElement('br'));
       contenido.appendChild(badge);
     }

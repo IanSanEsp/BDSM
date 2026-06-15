@@ -429,14 +429,18 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       if (modoVista !== 'dinamica') return false;
       const pid = Number(h?.id_profesor);
       const gid = Number(h?.id_grupo);
-      const horaIni = hhmm(h?.hora_inicio);
-      if (!Number.isFinite(pid) || !Number.isFinite(gid) || !horaIni) return false;
+      const startMin = timeToMinutes(h?.hora_inicio);
+      const endMin = timeToMinutes(h?.hora_fin);
+      if (!Number.isFinite(pid) || !Number.isFinite(gid) || startMin === null) return false;
       return ausencias_profesor.some((a) =>
         (a.fecha || fechaDinamica) === fechaDinamica &&
         normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
         Number(a.id_profesor) === pid &&
         Number(a.id_grupo) === gid &&
-        hhmm(a.hora) === horaIni
+        (() => {
+          const aMin = timeToMinutes(a.hora);
+          return aMin !== null && aMin >= startMin && (endMin === null || aMin < endMin);
+        })()
       );
     };
 
@@ -1100,14 +1104,19 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (startMins === null) continue;
         const req = staffIds(primerSlot);
         if (req.length === 0) continue;
-        const absentSet = ausenciasPorGrupoTiempo.get(Number(idGrupo))?.get(startMins);
-        if (!absentSet) continue;
-        // Si hay auxiliar asignado, debe estar ausente también.
-        const cubreSesion = req.every((pid) => absentSet.has(pid));
-        if (!cubreSesion) continue;
+        const grupoAusencias = ausenciasPorGrupoTiempo.get(Number(idGrupo));
+        if (!grupoAusencias) continue;
 
         for (let i = 0; i < sesion.slots.length; i++) {
-          horasAusentes.add(startMins + i * 60);
+          const blockMins = startMins + i * 60;
+          const absentSet = grupoAusencias.get(blockMins);
+          if (!absentSet) continue;
+          const cubreSesion = req.every((pid) => absentSet.has(pid));
+          if (!cubreSesion) continue;
+          for (let j = i; j < sesion.slots.length; j++) {
+            horasAusentes.add(startMins + j * 60);
+          }
+          break;
         }
       }
 
@@ -1940,29 +1949,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     }
   });
 
-  // modal qr (ahi lo checas)
-  const modalCodigoQr = document.getElementById('modal-codigo-qr');
-  const btnCodigoQr = document.getElementById('btn-codigo-qr');
-  const cerrarModalCodigoQr = document.getElementById('cerrar-modal-codigo-qr');
-
-  if (btnCodigoQr && modalCodigoQr) {
-    btnCodigoQr.addEventListener('click', () => {
-      modalCodigoQr.classList.add('activo');
-    });
-  }
-
-  if (cerrarModalCodigoQr) {
-    cerrarModalCodigoQr.addEventListener('click', () => {
-      if (modalCodigoQr) modalCodigoQr.classList.remove('activo');
-    });
-  }
-
-  window.addEventListener('click', (e) => {
-    if (e.target === modalCodigoQr) {
-      modalCodigoQr.classList.remove('activo');
-    }
-  });
-
   // advertencia + kebab (ifs c:) -> 5/11/2026 se añadio lo de historial (MALA MIA)
   // Mas que nada es para lo de borrar (que ni sirve) - 3/5/2026 -> ya no, ora tmb pal historial (tampoco sirve)
 
@@ -2164,11 +2150,12 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (historialMostrar) historialMostrar.addEventListener('click', cargarHistorial);
 
   // Renderizar
+  const DIAS_ORDEN = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
   const renderizarHorariosJerarquico = () => {
     if (!contenedorHorariosJerarquico) return;
     contenedorHorariosJerarquico.innerHTML = '';
 
-    // Agrupar horarios por semestre
     const semestresUnicos = [...new Set(grupos.map(g => g.semestre))].sort((a, b) => b - a);
 
     semestresUnicos.forEach(semestre => {
@@ -2184,82 +2171,120 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       `;
       headerSemestre.style.cursor = 'pointer';
       
-      const contenedorGrupos = document.createElement('div');
-      contenedorGrupos.className = 'contenedor-grupos-jerarquico';
-      contenedorGrupos.style.display = 'none';
+      const contenedorDias = document.createElement('div');
+      contenedorDias.className = 'contenedor-dias-jerarquico';
+      contenedorDias.style.display = 'none';
 
-      // Agrupar grupos por semestre
       const gruposPorSemestre = grupos.filter(g => g.semestre === semestre).sort((a, b) => a.nombre_grupo.localeCompare(b.nombre_grupo));
 
-      gruposPorSemestre.forEach(grupo => {
-        const divGrupo = document.createElement('div');
-        divGrupo.className = 'item-grupo-jerarquico';
-        
-        const headerGrupo = document.createElement('div');
-        headerGrupo.className = 'header-grupo';
-        headerGrupo.innerHTML = `
-          <span class="material-symbols-outlined">group</span>
-          <span class="texto-grupo">${grupo.nombre_grupo}</span>
+      DIAS_ORDEN.forEach(dia => {
+        let tieneHorarios = false;
+        for (const g of gruposPorSemestre) {
+          if (horario_fijo.some(h => h.id_grupo === g.id_grupo && h.dia === dia)) {
+            tieneHorarios = true;
+            break;
+          }
+        }
+        if (!tieneHorarios) return;
+
+        const divDia = document.createElement('div');
+        divDia.className = 'item-dia-jerarquico';
+
+        const headerDia = document.createElement('div');
+        headerDia.className = 'header-dia';
+        const etiquetaDia = dia === 'Sabado' ? 'Sábado' : dia;
+        headerDia.innerHTML = `
+          <span class="material-symbols-outlined">calendar_today</span>
+          <span class="texto-dia">${etiquetaDia}</span>
           <span class="material-symbols-outlined icono-expandir">expand_more</span>
         `;
-        headerGrupo.style.cursor = 'pointer';
-        
-        const contenedorHorarios = document.createElement('div');
-        contenedorHorarios.className = 'contenedor-horarios-items';
-        contenedorHorarios.style.display = 'none';
+        headerDia.style.cursor = 'pointer';
 
-        // Obtener horarios del grupo
-        const horariosGrupo = horario_fijo.filter(h => h.id_grupo === grupo.id_grupo).sort((a, b) => {
-          const horaA = parseInt(a.hora_inicio.split(':')[0]);
-          const horaB = parseInt(b.hora_inicio.split(':')[0]);
-          return horaA - horaB;
-        });
+        const contenedorGrupos = document.createElement('div');
+        contenedorGrupos.className = 'contenedor-grupos-jerarquico';
+        contenedorGrupos.style.display = 'none';
 
-        horariosGrupo.forEach(horario => {
-          const materia = materias.find(m => m.id_materia === horario.id_materia);
-          const profesor = usuarios.find(u => u.id_usuarios === horario.id_profesor);
-          const profesorAux = usuarios.find(u => u.id_usuarios === horario.id_profesor_aux);
-          const salon = salones.find(s => s.id_salon === horario.id_salon);
-
-          const divHorario = document.createElement('div');
-          divHorario.className = 'item-horario-jerarquico';
-          divHorario.style.cursor = 'pointer';
-          divHorario.innerHTML = `
-            <div class="horario-info">
-              <span class="horario-tiempo">${horario.hora_inicio} - ${horario.hora_fin}</span>
-              <span class="horario-materia">${materia?.nombre_materia || 'Sin materia'}</span>
-              <span class="horario-profesor">${profesor?.nombre || 'Sin profesor'}</span>
-              <span class="horario-salon">${salon?.numero_salon || 'S/N'}</span>
-            </div>
-            <span class="material-symbols-outlined">edit</span>
-          `;
-
-          divHorario.addEventListener('click', () => {
-            abrirModalEditarHorario(horario, grupo, materia, profesor, profesorAux, salon);
+        gruposPorSemestre.forEach(grupo => {
+          const horariosGrupo = horario_fijo.filter(h => h.id_grupo === grupo.id_grupo && h.dia === dia).sort((a, b) => {
+            const horaA = parseInt(a.hora_inicio.split(':')[0]);
+            const horaB = parseInt(b.hora_inicio.split(':')[0]);
+            return horaA - horaB;
           });
 
-          contenedorHorarios.appendChild(divHorario);
+          if (horariosGrupo.length === 0) return;
+
+          const divGrupo = document.createElement('div');
+          divGrupo.className = 'item-grupo-jerarquico';
+          
+          const headerGrupo = document.createElement('div');
+          headerGrupo.className = 'header-grupo';
+          headerGrupo.innerHTML = `
+            <span class="material-symbols-outlined">group</span>
+            <span class="texto-grupo">${grupo.nombre_grupo}</span>
+            <span class="material-symbols-outlined icono-expandir">expand_more</span>
+          `;
+          headerGrupo.style.cursor = 'pointer';
+          
+          const contenedorHorarios = document.createElement('div');
+          contenedorHorarios.className = 'contenedor-horarios-items';
+          contenedorHorarios.style.display = 'none';
+
+          horariosGrupo.forEach(horario => {
+            const materia = materias.find(m => m.id_materia === horario.id_materia);
+            const profesor = usuarios.find(u => u.id_usuarios === horario.id_profesor);
+            const profesorAux = usuarios.find(u => u.id_usuarios === horario.id_profesor_aux);
+            const salon = salones.find(s => s.id_salon === horario.id_salon);
+
+            const divHorario = document.createElement('div');
+            divHorario.className = 'item-horario-jerarquico';
+            divHorario.style.cursor = 'pointer';
+            divHorario.innerHTML = `
+              <div class="horario-info">
+                <span class="horario-tiempo">${horario.hora_inicio} - ${horario.hora_fin}</span>
+                <span class="horario-materia">${materia?.nombre_materia || 'Sin materia'}</span>
+                <span class="horario-profesor">${profesor?.nombre || 'Sin profesor'}</span>
+                <span class="horario-salon">${salon?.numero_salon || 'S/N'}</span>
+              </div>
+              <span class="material-symbols-outlined">edit</span>
+            `;
+
+            divHorario.addEventListener('click', () => {
+              abrirModalEditarHorario(horario, grupo, materia, profesor, profesorAux, salon);
+            });
+
+            contenedorHorarios.appendChild(divHorario);
+          });
+
+          headerGrupo.addEventListener('click', () => {
+            const estaAbierto = contenedorHorarios.style.display !== 'none';
+            contenedorHorarios.style.display = estaAbierto ? 'none' : 'block';
+            headerGrupo.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
+          });
+
+          divGrupo.appendChild(headerGrupo);
+          divGrupo.appendChild(contenedorHorarios);
+          contenedorGrupos.appendChild(divGrupo);
         });
 
-        headerGrupo.addEventListener('click', () => {
-          const estaAbierto = contenedorHorarios.style.display !== 'none';
-          contenedorHorarios.style.display = estaAbierto ? 'none' : 'block';
-          headerGrupo.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
+        headerDia.addEventListener('click', () => {
+          const estaAbierto = contenedorGrupos.style.display !== 'none';
+          contenedorGrupos.style.display = estaAbierto ? 'none' : 'block';
+          headerDia.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
         });
 
-        divGrupo.appendChild(headerGrupo);
-        divGrupo.appendChild(contenedorHorarios);
-        contenedorGrupos.appendChild(divGrupo);
+        divDia.appendChild(headerDia);
+        divDia.appendChild(contenedorGrupos);
+        contenedorDias.appendChild(divDia);
       });
 
       headerSemestre.addEventListener('click', () => {
-        const estaAbierto = contenedorGrupos.style.display !== 'none';
-        contenedorGrupos.style.display = estaAbierto ? 'none' : 'block';
+        const estaAbierto = contenedorDias.style.display !== 'none';
+        contenedorDias.style.display = estaAbierto ? 'none' : 'block';
         headerSemestre.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
       });
 
       divSemestre.appendChild(headerSemestre);
-      divSemestre.appendChild(contenedorGrupos);
+      divSemestre.appendChild(contenedorDias);
       contenedorHorariosJerarquico.appendChild(divSemestre);
     });
   };
@@ -2761,18 +2786,22 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   // Confirmar Borrado (Ian checa esto)
   if (botonConfirmarModal && modalConfirmacion) {
-    botonConfirmarModal.addEventListener('click', () => {
-      console.log('Borrando horarios del semestre:', semestreSeleccionado);
-      
-    // todo esto no sirve
-      const cuerpoTabla = document.getElementById('cuerpo-tabla-horarios');
-      if (cuerpoTabla) {
-        cuerpoTabla.innerHTML = '<tr><td colspan="15" style="text-align:center; padding: 40px; color: #6b7280;">Horarios borrados correctamente.</td></tr>';
-      }
-      
+    botonConfirmarModal.addEventListener('click', async () => {
       modalConfirmacion.classList.remove('activo');
-      
-      mostrarTostada({ titulo: 'Éxito', mensaje: 'Los horarios han sido eliminados.', tipo: 'exito' });
+      try {
+        await fetchJson('/horarios/todos', { method: 'DELETE', auth: true });
+
+        const cuerpoTabla = document.getElementById('cuerpo-tabla-horarios');
+        if (cuerpoTabla) {
+          cuerpoTabla.innerHTML = '<tr><td colspan="15" style="text-align:center; padding: 40px; color: #6b7280;">Horarios borrados correctamente.</td></tr>';
+        }
+
+        mostrarTostada({ titulo: 'Éxito', mensaje: 'Todos los horarios han sido eliminados.', tipo: 'exito' });
+
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        mostrarTostada({ titulo: 'Error', mensaje: err?.message || 'No se pudieron eliminar los horarios.', tipo: 'error' });
+      }
     });
   }
   renderizarTabla();
@@ -3045,11 +3074,96 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     });
   }
 
-  if (opcionImportarExcel) { // wenazo, chamba
+  if (opcionImportarExcel) {
+    const modalImportar = document.getElementById('modal-importar-excel');
+    const btnCerrarImportar = document.getElementById('cerrar-modal-importar-excel');
+    const btnCancelarImportar = document.getElementById('btn-cancelar-importar');
+    const btnEjecutarImportar = document.getElementById('btn-ejecutar-importar');
+    const inputArchivoExcel = document.getElementById('input-archivo-excel');
+    const nombreArchivoEl = document.getElementById('nombre-archivo-excel');
+    const resultadoEl = document.getElementById('resultado-importar');
+    let archivoSeleccionado = null;
+
     opcionImportarExcel.addEventListener('click', () => {
       menuNuevoRegistro.classList.remove('activo');
-      mostrarTostada({ titulo: 'Aviso', mensaje: 'Todavia no', tipo: 'advertencia' });
+      archivoSeleccionado = null;
+      nombreArchivoEl.textContent = 'Haz clic o arrastra un archivo .xlsx aquí';
+      btnEjecutarImportar.disabled = true;
+      resultadoEl.style.display = 'none';
+      resultadoEl.innerHTML = '';
+      if (inputArchivoExcel) inputArchivoExcel.value = '';
+      modalImportar?.classList.add('activo');
     });
+
+    const cerrarImportar = () => modalImportar?.classList.remove('activo');
+    btnCerrarImportar?.addEventListener('click', cerrarImportar);
+    btnCancelarImportar?.addEventListener('click', cerrarImportar);
+    modalImportar?.addEventListener('click', e => { if (e.target === modalImportar) cerrarImportar(); });
+
+    inputArchivoExcel?.addEventListener('change', () => {
+      const f = inputArchivoExcel.files[0];
+      if (f) {
+        archivoSeleccionado = f;
+        nombreArchivoEl.textContent = f.name;
+        btnEjecutarImportar.disabled = false;
+        resultadoEl.style.display = 'none';
+      }
+    });
+
+    btnEjecutarImportar?.addEventListener('click', async () => {
+      if (!archivoSeleccionado) return;
+      btnEjecutarImportar.disabled = true;
+      btnEjecutarImportar.textContent = 'Importando\u2026';
+      resultadoEl.style.display = 'none';
+
+      const formData = new FormData();
+      formData.append('archivo', archivoSeleccionado);
+
+      const token = getSessionToken();
+      try {
+        const res = await fetch(`${apiBase}/data/import/horarios-excel`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData
+        });
+        const data = await res.json();
+
+        resultadoEl.style.display = 'block';
+        if (data.success) {
+          resultadoEl.innerHTML = `
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;">
+              <p style="color:#15803d;font-weight:700;margin-bottom:6px;">
+                \u2713 ${data.insertados} registro(s) importado(s) correctamente.
+              </p>
+              ${data.errores?.length ? renderErroresImport(data.errores) : ''}
+            </div>`;
+          if (!data.errores?.length) setTimeout(cerrarImportar, 2000);
+          if (typeof cargarYRenderizarTabla === 'function') cargarYRenderizarTabla();
+          if (typeof renderizarAlertas === 'function') renderizarAlertas();
+        } else {
+          resultadoEl.innerHTML = `
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;">
+              <p style="color:#b91c1c;font-weight:700;margin-bottom:6px;">\u2717 ${data.message}</p>
+              ${data.errores?.length ? renderErroresImport(data.errores) : ''}
+            </div>`;
+        }
+      } catch (e) {
+        resultadoEl.style.display = 'block';
+        resultadoEl.innerHTML = `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;color:#b91c1c;">Error de conexi\u00f3n: ${e.message}</div>`;
+      } finally {
+        btnEjecutarImportar.disabled = false;
+        btnEjecutarImportar.innerHTML = '<span class="material-symbols-outlined md-18" style="vertical-align:middle;">cloud_upload</span> Importar';
+      }
+    });
+
+    function renderErroresImport(errores) {
+      if (!errores?.length) return '';
+      const items = errores.slice(0, 10).map(e =>
+        `<li>Fila ${e.fila}: ${Array.isArray(e.errores) ? e.errores.join(', ') : e.errores}</li>`
+      ).join('');
+      const extra = errores.length > 10 ? `<li>\u2026y ${errores.length - 10} m\u00e1s</li>` : '';
+      return `<div style="margin-top:10px;"><p style="font-weight:600;color:#92400e;margin-bottom:4px;">Advertencias (${errores.length}):</p><ul style="font-size:0.78rem;color:#78350f;padding-left:18px;">${items}${extra}</ul></div>`;
+    }
   }
 
   if (btnCerrarRegistro) {
@@ -3171,6 +3285,30 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   let salonSeleccionadoReasignacion = null;
 
+  const generarOpcionesHoraSelect = (selectEl, horaInicio, horaFin) => {
+    if (!selectEl) return;
+    selectEl.innerHTML = '<option value="">Seleccionar hora</option>';
+    if (!horaInicio || !horaFin) return;
+    const ini = timeToMinutes(horaInicio);
+    const fin = timeToMinutes(horaFin);
+    if (ini === null || fin === null || ini >= fin) return;
+    for (let m = ini; m < fin; m += 60) {
+      const opt = document.createElement('option');
+      opt.value = minutesToHHMM(m);
+      opt.textContent = minutesToHHMM(m);
+      selectEl.appendChild(opt);
+    }
+  };
+
+  const existeIncidenciaDuplicada = (fecha, hora, idProfesor, idGrupo) => {
+    return (ausencias_profesor || []).some(a =>
+      (a.fecha || fechaDinamica) === fecha &&
+      Number(a.id_profesor) === Number(idProfesor) &&
+      Number(a.id_grupo) === Number(idGrupo) &&
+      hhmm(a.hora) === hhmm(hora)
+    );
+  };
+
   const formatPeriodoWidget = (horaInicio, horaFin) => {
     const ini = String(horaInicio || '').trim();
     const fin = String(horaFin || '').trim();
@@ -3235,7 +3373,19 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     // Mostrar/ocultar acciones según modo
     if (infoBotonAccion) {
       const esAdelanto = !!horario?.id_horario_dinamico;
-      infoBotonAccion.style.display = (modoVista === 'robusta' || esAdelanto) ? 'none' : '';
+      const tieneIncidencia = (ausencias_profesor || []).some(a =>
+        (a.fecha || fechaDinamica) === fechaDinamica &&
+        normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
+        Number(a.id_profesor) === Number(horario?.id_profesor) &&
+        Number(a.id_grupo) === Number(horario?.id_grupo) &&
+        (() => {
+          const aMin = timeToMinutes(a.hora);
+          const startMin = timeToMinutes(horario?.hora_inicio);
+          const endMin = timeToMinutes(horario?.hora_fin);
+          return aMin !== null && startMin !== null && aMin >= startMin && (endMin === null || aMin < endMin);
+        })()
+      );
+      infoBotonAccion.style.display = (modoVista === 'robusta' || esAdelanto || tieneIncidencia) ? 'none' : '';
     }
 
     horarioActualEnWidget = horario; // guarda horario actual (registrar incidencia)
@@ -3285,8 +3435,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           }
         }
       }
-      const btnQrInit = document.getElementById('btn-codigo-qr');
-      if (btnQrInit) btnQrInit.classList.add('oculto');
       modalRegistrarIncidencia.classList.add('activo');
     });
   }
@@ -3301,17 +3449,17 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (incTipoEl) {
     incTipoEl.addEventListener('change', () => {
       const v = incTipoEl.value;
-      const btnQr = document.getElementById('btn-codigo-qr');
       if (v === 'ausencia_profesor') {
         if (incHoraContainer) incHoraContainer.classList.remove('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.remove('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.remove('oculto');
+        if (horarioActualEnWidget) {
+          generarOpcionesHoraSelect(incHoraEl, horarioActualEnWidget.hora_inicio, horarioActualEnWidget.hora_fin);
+        }
       } else if (v === 'reasignacion_salon') {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.remove('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
         salonSeleccionadoReasignacion = null;
         if (incSalonBtn) {
           incSalonBtn.textContent = 'Salón: —';
@@ -3321,7 +3469,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
       }
     });
   }
@@ -3409,6 +3556,10 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           : 'No se pudo identificar el profesor del horario.',
           tipo: 'advertencia'
         });
+        return;
+      }
+      if (existeIncidenciaDuplicada(fechaDinamica, hhmm(horaRegistro), profesorSeleccionado, horarioActualEnWidget.id_grupo)) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Ya existe una incidencia registrada para esta clase en esa hora.', tipo: 'advertencia' });
         return;
       }
 

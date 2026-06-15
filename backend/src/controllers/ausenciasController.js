@@ -50,6 +50,15 @@ export const registrarAusencia = async (req, res) => {
     const [gRows] = await db.query("SELECT id_grupo FROM Grupos WHERE id_grupo = ? LIMIT 1", [id_grupo]);
     if (!gRows || gRows.length === 0) return res.status(400).json({ error: "Grupo no encontrado" });
 
+    // Verificar duplicado
+    const [dupRows] = await db.query(
+      `SELECT COUNT(*) AS cnt FROM Incidencias WHERE fecha = ? AND hora = ? AND id_profesor = ? AND id_grupo = ?`,
+      [fecha, hora, id_profesor, id_grupo]
+    );
+    if (dupRows && dupRows[0] && Number(dupRows[0].cnt) > 0) {
+      return res.status(409).json({ error: "Ya existe una incidencia registrada para esta clase en esa hora." });
+    }
+
     await db.query(
       `INSERT INTO Incidencias (fecha, hora, id_profesor, id_grupo, accion_tomada)
        VALUES (?, ?, ?, ?, ?)`,

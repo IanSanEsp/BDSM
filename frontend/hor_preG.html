@@ -523,7 +523,9 @@
 
             <div class="campo-formulario oculto" id="inc-hora-container">
               <label>Hora (registro)</label>
-              <input type="time" id="inc-hora">
+              <select id="inc-hora">
+                <option value="">Seleccionar hora</option>
+              </select>
             </div>
 
             <div class="campo-formulario oculto" id="inc-salon-container">
@@ -538,27 +540,13 @@
             </div>
 
             <div class="acciones-incidencia" style="margin-top:8px;">
-              <button type="button" id="btn-codigo-qr" class="boton-secundario oculto">Código QR</button>
               <button type="submit" class="boton-registro">Registrar Incidencia</button>
             </div>
           </form>
         </div>
       </div>
     </div>
-    <!-- Modal Codigo QR -->
-    <div id="modal-codigo-qr" class="modal-overlay">
-      <div class="modal-contenido modal-grande" style="max-width:380px;">
-        <div class="modal-cabecera">
-          <h2>Código QR</h2>
-          <button id="cerrar-modal-codigo-qr" class="boton-icono">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="modal-cuerpo" id="cuerpo-modal-codigo-qr">
-          <!-- Vacio (placeholder) -->
-        </div>
-      </div>
-    </div>
+
     <!-- Modal Confirmar Adelanto -->
     <div id="modal-confirmar-adelanto" class="modal-overlay">
       <div class="modal-contenido modal-grande" style="max-width:520px;">
@@ -621,7 +609,46 @@
         </div>
       </div>
     </div>
-    <script type="module" src="src/hor_preG.js?v=2026-05-25-4"></script>
+
+    <!-- Modal Importar Excel -->
+    <div id="modal-importar-excel" class="modal-overlay">
+      <div class="modal-contenido modal-grande" style="max-width:540px;">
+        <div class="modal-cabecera">
+          <h2>Importar Horarios desde Excel</h2>
+          <button id="cerrar-modal-importar-excel" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo">
+          <div class="campo-formulario" style="margin-bottom:16px;">
+            <p style="font-size:0.82rem;color:#64748b;margin-bottom:10px;">
+              El archivo debe tener las columnas:
+              <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:0.78rem;">
+                id_grupo, id_materia, id_profesor, dia, hora_inicio, hora_fin, bloque_horario
+              </code><br>
+              (Opcional: id_salon, id_auxiliar)
+            </p>
+            <label for="input-archivo-excel" style="display:flex;flex-direction:column;align-items:center;gap:10px;border:2px dashed #cbd5e1;border-radius:10px;padding:28px 16px;cursor:pointer;background:#f8fafc;transition:border-color .2s;" id="zona-drop-excel">
+              <span class="material-symbols-outlined" style="font-size:2.5rem;color:#94a3b8;">upload_file</span>
+              <span id="nombre-archivo-excel" style="font-size:0.85rem;color:#64748b;">Haz clic o arrastra un archivo .xlsx aquí</span>
+              <input type="file" id="input-archivo-excel" accept=".xlsx,.xls" style="display:none;">
+            </label>
+          </div>
+
+          <div id="resultado-importar" style="display:none;margin-top:12px;"></div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+            <button type="button" id="btn-cancelar-importar" class="boton-secundario">Cancelar</button>
+            <button type="button" id="btn-ejecutar-importar" class="boton-registro" disabled>
+              <span class="material-symbols-outlined md-18" style="vertical-align:middle;">cloud_upload</span>
+              Importar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="src/hor_preG.js?v=2026-06-15-6"></script>
       <script src="src/tostada.js"></script>
   </body>
 </html>

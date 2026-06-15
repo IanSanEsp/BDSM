@@ -467,14 +467,18 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       if (modoVista !== 'dinamica') return false;
       const pid = Number(h?.id_profesor);
       const gid = Number(h?.id_grupo);
-      const horaIni = hhmm(h?.hora_inicio);
-      if (!Number.isFinite(pid) || !Number.isFinite(gid) || !horaIni) return false;
+      const startMin = timeToMinutes(h?.hora_inicio);
+      const endMin = timeToMinutes(h?.hora_fin);
+      if (!Number.isFinite(pid) || !Number.isFinite(gid) || startMin === null) return false;
       return ausencias_profesor.some((a) =>
         (a.fecha || fechaDinamica) === fechaDinamica &&
         normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
         Number(a.id_profesor) === pid &&
         Number(a.id_grupo) === gid &&
-        hhmm(a.hora) === horaIni
+        (() => {
+          const aMin = timeToMinutes(a.hora);
+          return aMin !== null && aMin >= startMin && (endMin === null || aMin < endMin);
+        })()
       );
     };
 
@@ -1138,14 +1142,19 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (startMins === null) continue;
         const req = staffIds(primerSlot);
         if (req.length === 0) continue;
-        const absentSet = ausenciasPorGrupoTiempo.get(Number(idGrupo))?.get(startMins);
-        if (!absentSet) continue;
-        // Si hay auxiliar asignado, debe estar ausente también.
-        const cubreSesion = req.every((pid) => absentSet.has(pid));
-        if (!cubreSesion) continue;
+        const grupoAusencias = ausenciasPorGrupoTiempo.get(Number(idGrupo));
+        if (!grupoAusencias) continue;
 
         for (let i = 0; i < sesion.slots.length; i++) {
-          horasAusentes.add(startMins + i * 60);
+          const blockMins = startMins + i * 60;
+          const absentSet = grupoAusencias.get(blockMins);
+          if (!absentSet) continue;
+          const cubreSesion = req.every((pid) => absentSet.has(pid));
+          if (!cubreSesion) continue;
+          for (let j = i; j < sesion.slots.length; j++) {
+            horasAusentes.add(startMins + j * 60);
+          }
+          break;
         }
       }
 
@@ -1974,29 +1983,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   window.addEventListener('click', (e) => {
     if (e.target === modalAlertas) {
       modalAlertas.classList.remove('activo');
-    }
-  });
-
-  // modal qr (ahi lo checas)
-  const modalCodigoQr = document.getElementById('modal-codigo-qr');
-  const btnCodigoQr = document.getElementById('btn-codigo-qr');
-  const cerrarModalCodigoQr = document.getElementById('cerrar-modal-codigo-qr');
-
-  if (btnCodigoQr && modalCodigoQr) {
-    btnCodigoQr.addEventListener('click', () => {
-      modalCodigoQr.classList.add('activo');
-    });
-  }
-
-  if (cerrarModalCodigoQr) {
-    cerrarModalCodigoQr.addEventListener('click', () => {
-      if (modalCodigoQr) modalCodigoQr.classList.remove('activo');
-    });
-  }
-
-  window.addEventListener('click', (e) => {
-    if (e.target === modalCodigoQr) {
-      modalCodigoQr.classList.remove('activo');
     }
   });
 
@@ -3207,6 +3193,30 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
   let salonSeleccionadoReasignacion = null;
 
+  const generarOpcionesHoraSelect = (selectEl, horaInicio, horaFin) => {
+    if (!selectEl) return;
+    selectEl.innerHTML = '<option value="">Seleccionar hora</option>';
+    if (!horaInicio || !horaFin) return;
+    const ini = timeToMinutes(horaInicio);
+    const fin = timeToMinutes(horaFin);
+    if (ini === null || fin === null || ini >= fin) return;
+    for (let m = ini; m < fin; m += 60) {
+      const opt = document.createElement('option');
+      opt.value = minutesToHHMM(m);
+      opt.textContent = minutesToHHMM(m);
+      selectEl.appendChild(opt);
+    }
+  };
+
+  const existeIncidenciaDuplicada = (fecha, hora, idProfesor, idGrupo) => {
+    return (ausencias_profesor || []).some(a =>
+      (a.fecha || fechaDinamica) === fecha &&
+      Number(a.id_profesor) === Number(idProfesor) &&
+      Number(a.id_grupo) === Number(idGrupo) &&
+      hhmm(a.hora) === hhmm(hora)
+    );
+  };
+
   const formatPeriodoWidget = (horaInicio, horaFin) => {
     const ini = String(horaInicio || '').trim();
     const fin = String(horaFin || '').trim();
@@ -3271,7 +3281,19 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     // Mostrar/ocultar acciones según modo
     if (infoBotonAccion) {
       const esAdelanto = !!horario?.id_horario_dinamico;
-      infoBotonAccion.style.display = (modoVista === 'robusta' || esAdelanto) ? 'none' : '';
+      const tieneIncidencia = (ausencias_profesor || []).some(a =>
+        (a.fecha || fechaDinamica) === fechaDinamica &&
+        normalizarTipoIncidencia(a.tipo_incidencia ?? a.tipo) === 'ausencia_profesor' &&
+        Number(a.id_profesor) === Number(horario?.id_profesor) &&
+        Number(a.id_grupo) === Number(horario?.id_grupo) &&
+        (() => {
+          const aMin = timeToMinutes(a.hora);
+          const startMin = timeToMinutes(horario?.hora_inicio);
+          const endMin = timeToMinutes(horario?.hora_fin);
+          return aMin !== null && startMin !== null && aMin >= startMin && (endMin === null || aMin < endMin);
+        })()
+      );
+      infoBotonAccion.style.display = (modoVista === 'robusta' || esAdelanto || tieneIncidencia) ? 'none' : '';
     }
 
     horarioActualEnWidget = horario; // guarda horario actual (registrar incidencia)
@@ -3321,8 +3343,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           }
         }
       }
-      const btnQrInit = document.getElementById('btn-codigo-qr');
-      if (btnQrInit) btnQrInit.classList.add('oculto');
       modalRegistrarIncidencia.classList.add('activo');
     });
   }
@@ -3337,17 +3357,17 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (incTipoEl) {
     incTipoEl.addEventListener('change', () => {
       const v = incTipoEl.value;
-      const btnQr = document.getElementById('btn-codigo-qr');
       if (v === 'ausencia_profesor') {
         if (incHoraContainer) incHoraContainer.classList.remove('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.remove('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.remove('oculto');
+        if (horarioActualEnWidget) {
+          generarOpcionesHoraSelect(incHoraEl, horarioActualEnWidget.hora_inicio, horarioActualEnWidget.hora_fin);
+        }
       } else if (v === 'reasignacion_salon') {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.remove('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
         salonSeleccionadoReasignacion = null;
         if (incSalonBtn) {
           incSalonBtn.textContent = 'Salón: —';
@@ -3357,7 +3377,6 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
       }
     });
   }
@@ -3445,6 +3464,11 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
           : 'No se pudo identificar el profesor del horario.',
           tipo: 'advertencia'
         });
+        return;
+      }
+
+      if (existeIncidenciaDuplicada(fechaDinamica, hhmm(horaRegistro), profesorSeleccionado, horarioActualEnWidget.id_grupo)) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Ya existe una incidencia registrada para esta clase en esa hora.', tipo: 'advertencia' });
         return;
       }
 

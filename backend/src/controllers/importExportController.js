@@ -568,3 +568,230 @@ export const importHorarios = async (req, res) => {
     return res.status(500).json({ error: 'Error interno al importar horarios' });
   }
 };
+
+//Importar horarios desde Excel (Horario_Fijo + horarios)
+const COLS_REQUERIDAS_IMPORT = ['id_grupo', 'id_materia', 'id_profesor', 'dia', 'hora_inicio', 'hora_fin', 'bloque_horario'];
+const COLS_OPCIONALES_IMPORT = ['id_salon', 'id_auxiliar'];
+
+function horarioAMinutos(h) {
+  if (!h) return 0;
+  const p = String(h).split(':');
+  return Number(p[0]) * 60 + Number(p[1] || 0);
+}
+
+function horariosSeTraslapan(a, b) {
+  const ai = horarioAMinutos(a.hora_inicio);
+  const af = horarioAMinutos(a.hora_fin);
+  const bi = horarioAMinutos(b.hora_inicio);
+  const bf = horarioAMinutos(b.hora_fin);
+  return ai < bf && af > bi;
+}
+
+export const importarExcelHorarios = async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No se recibió archivo' });
+
+  try {
+    const wb = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(ws, { raw: false, defval: '' });
+
+    if (rows.length === 0)
+      return res.status(400).json({ success: false, message: 'El archivo está vacío' });
+
+    const colsPresentes = Object.keys(rows[0]);
+    const faltantes = [...COLS_REQUERIDAS_IMPORT].filter(c => !colsPresentes.includes(c));
+    if (faltantes.length > 0)
+      return res.status(400).json({ success: false, message: `Columnas faltantes: ${faltantes.join(', ')}` });
+
+    const errores = [];
+    const validos = [];
+    const claveProfesorExcel = new Map(); // key -> fila
+    const claveSalonExcel = new Map(); 
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const fila = i + 2;
+      const rowErr = [];
+
+      for (const col of COLS_REQUERIDAS_IMPORT) {
+        if (row[col] === '' || row[col] == null) rowErr.push(`${col} vacío`);
+      }
+      if (rowErr.length) { errores.push({ fila, errores: rowErr }); continue; }
+
+      // Normalizar hora_inicio y hora_fin con ceros
+      const normalizarHora = (v) => {
+        if (!v) return v;
+        const s = String(v).replace(/\s/g, '');
+        if (/^\d{1,2}:\d{2}$/.test(s)) return s;
+        const p = s.split(':');
+        return `${String(Number(p[0])).padStart(2,'0')}:${String(Number(p[1])).padStart(2,'0')}`;
+      };
+      const hInicio = normalizarHora(row.hora_inicio);
+      const hFin = normalizarHora(row.hora_fin);
+      if (!hInicio || !hFin) {
+        errores.push({ fila, errores: ['hora_inicio o hora_fin con formato inválido'] });
+        continue;
+      }
+      row.hora_inicio = hInicio;
+      row.hora_fin = hFin;
+
+      // Conflicto de profesor en el mismo Excel rango horario se traslapa
+      const profKey = `${row.id_profesor}_${row.dia}`;
+      if (claveProfesorExcel.has(profKey)) {
+        const existentes = claveProfesorExcel.get(profKey);
+        let conflicto = false;
+        for (const existente of existentes) {
+          if (horariosSeTraslapan(row, existente)) {
+            conflicto = true;
+            break;
+          }
+        }
+        if (conflicto) {
+          errores.push({ fila, errores: [`Duplicado en archivo: profesor ${row.id_profesor} ya tiene clase el ${row.dia} en horario que se traslapa`] });
+          continue;
+        }
+        existentes.push(row);
+      } else {
+        claveProfesorExcel.set(profKey, [row]);
+      }
+
+      // Conflicto de salon en el mismo Excel
+      if (row.id_salon !== '' && row.id_salon != null) {
+        const salonKey = `${row.id_salon}_${row.dia}`;
+        if (claveSalonExcel.has(salonKey)) {
+          const existentes = claveSalonExcel.get(salonKey);
+          let conflicto = false;
+          for (const existente of existentes) {
+            if (horariosSeTraslapan(row, existente)) {
+              conflicto = true;
+              break;
+            }
+          }
+          if (conflicto) {
+            errores.push({ fila, errores: [`Duplicado en archivo: salón ${row.id_salon} ya tiene clase el ${row.dia} en horario que se traslapa`] });
+            continue;
+          }
+          existentes.push(row);
+        } else {
+          claveSalonExcel.set(salonKey, [row]);
+        }
+      }
+
+      validos.push({ ...row, _fila: fila });
+    }
+
+    if (validos.length === 0)
+      return res.status(400).json({ success: false, message: 'No hay filas válidas para importar', errores });
+
+    const filasConflicto = new Set();
+    for (const row of validos) {
+      // Conflicto de salón en BD solo si tiene id_salon
+      if (row.id_salon !== '' && row.id_salon != null) {
+        const [exSalon] = await db.query(
+          `SELECT 1 FROM Horario_Fijo WHERE id_salon = ? AND dia = ? AND hora_inicio < ? AND hora_fin > ? LIMIT 1`,
+          [row.id_salon, row.dia, row.hora_fin, row.hora_inicio]
+        );
+        if (exSalon.length) {
+          errores.push({ fila: row._fila, errores: [`Conflicto BD: salón ${row.id_salon} ya tiene clase el ${row.dia} en horario que se traslapa`] });
+          filasConflicto.add(row._fila);
+        }
+      }
+      // Conflicto de profesor en BD
+      const [exProf] = await db.query(
+        `SELECT 1 FROM Horario_Fijo WHERE id_profesor = ? AND dia = ? AND hora_inicio < ? AND hora_fin > ? LIMIT 1`,
+        [row.id_profesor, row.dia, row.hora_fin, row.hora_inicio]
+      );
+      if (exProf.length && !filasConflicto.has(row._fila)) {
+        errores.push({ fila: row._fila, errores: [`Conflicto BD: profesor ${row.id_profesor} ya tiene clase el ${row.dia} en horario que se traslapa`] });
+        filasConflicto.add(row._fila);
+      }
+    }
+
+    const paraInsertar = validos.filter(r => !filasConflicto.has(r._fila));
+    if (paraInsertar.length === 0)
+      return res.status(409).json({ success: false, message: 'Todos los registros tienen conflictos con la BD', errores });
+
+    let insertados = 0;
+    // Verificar si la columna grupo_horario existe en horarios y su tipo
+    const grupoHorarioInfo = await (async () => {
+      const [r] = await db.query(
+        `SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'horarios' AND COLUMN_NAME = 'grupo_horario'`
+      );
+      if (r && r.length > 0) {
+        return { exists: true, type: r[0].DATA_TYPE };
+      }
+      return { exists: false };
+    })();
+
+    // Verificar si id_salon en Horario_Fijo acepta NULL
+    const salonNullable = await (async () => {
+      const [r] = await db.query(
+        `SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Horario_Fijo' AND COLUMN_NAME = 'id_salon'`
+      );
+      return r && r.length > 0 && r[0].IS_NULLABLE === 'YES';
+    })();
+
+    try {
+      await db.query('START TRANSACTION');
+      for (const row of paraInsertar) {
+        const [hRows] = await db.query(
+          `SELECT id_horario_fijo FROM horarios WHERE id_grupo = ? LIMIT 1`, [row.id_grupo]
+        );
+        let id_horario_fijo;
+        if (hRows.length > 0) {
+          id_horario_fijo = hRows[0].id_horario_fijo;
+        } else {
+          const [maxRow] = await db.query(
+            "SELECT COALESCE(MAX(id_horario_fijo), 0) + 1 AS next_id FROM horarios"
+          );
+          const nextId = maxRow[0].next_id;
+          const grupoNombre = row.nombre_grupo || `Grupo ${row.id_grupo}`;
+          if (grupoHorarioInfo.exists) {
+            const grupoHorarioVal = grupoHorarioInfo.type === 'int'
+              ? Number(row.id_grupo)
+              : grupoNombre;
+            await db.query(
+              "INSERT INTO horarios (id_horario_fijo, id_grupo, grupo_horario, nombre_horario) VALUES (?, ?, ?, ?)",
+              [nextId, row.id_grupo, grupoHorarioVal, `Horario ${grupoNombre}`]
+            );
+          } else {
+            await db.query(
+              "INSERT INTO horarios (id_horario_fijo, id_grupo, nombre_horario) VALUES (?, ?, ?)",
+              [nextId, row.id_grupo, `Horario ${grupoNombre}`]
+            );
+          }
+          id_horario_fijo = nextId;
+        }
+
+        const auxiliar = row.id_auxiliar || null;
+        let salonVal = (row.id_salon !== '' && row.id_salon != null) ? row.id_salon : null;
+        if (salonVal === null && !salonNullable) {
+          salonVal = 1; // fallback si la columna no acepta NULL
+        }
+        await db.query(
+          `INSERT INTO Horario_Fijo (id_horario_fijo, id_materia, id_profesor, id_auxiliar, id_salon, dia, hora_inicio, hora_fin, bloque_horario)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id_horario_fijo, row.id_materia, row.id_profesor, auxiliar, salonVal, row.dia, row.hora_inicio, row.hora_fin, row.bloque_horario]
+        );
+        insertados++;
+      }
+      await db.query('COMMIT');
+    } catch (e) {
+      await db.query('ROLLBACK');
+      throw e;
+    }
+
+    res.json({
+      success: true,
+      message: `${insertados} registro(s) importado(s) correctamente`,
+      insertados,
+      errores: errores.length ? errores : undefined
+    });
+
+  } catch (e) {
+    console.error('Error importando Excel:', e);
+    res.status(500).json({ success: false, message: `Error procesando archivo: ${e.message}` });
+  }
+};

@@ -853,3 +853,17 @@ export const tablaDinamicaPorFecha = async (req, res) => {
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+//Eliminar TODOS los horarios
+export const eliminarTodosHorarios = async (req, res) => {
+  try {
+    await db.query("DELETE FROM Horario_Dinamico");
+    const [hfResult] = await db.query("DELETE FROM Horario_Fijo");
+    const deletedFijos = hfResult?.affectedRows || 0;
+    await db.query("DELETE FROM horarios");
+    return res.json({ message: "Todos los horarios han sido eliminados", deletedFijos });
+  } catch (err) {
+    console.error("Error al eliminar todos los horarios:", err);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};

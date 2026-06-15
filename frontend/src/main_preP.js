@@ -667,6 +667,30 @@ document.addEventListener('DOMContentLoaded', () => {
   let salonSeleccionadoReasignacion = null;
   let salonSelectorMapApi = null;
 
+  const generarOpcionesHoraSelect = (selectEl, horaInicio, horaFin) => {
+    if (!selectEl) return;
+    selectEl.innerHTML = '<option value="">Seleccionar hora</option>';
+    if (!horaInicio || !horaFin) return;
+    const ini = timeToMinutes(horaInicio);
+    const fin = timeToMinutes(horaFin);
+    if (ini === null || fin === null || ini >= fin) return;
+    for (let m = ini; m < fin; m += 60) {
+      const opt = document.createElement('option');
+      opt.value = minutesToHHMM(m);
+      opt.textContent = minutesToHHMM(m);
+      selectEl.appendChild(opt);
+    }
+  };
+
+  const existeIncidenciaDuplicada = (fecha, hora, idProfesor, idGrupo) => {
+    return (ausencias_profesor || []).some(a =>
+      (a.fecha || fechaDinamica) === fecha &&
+      Number(a.id_profesor) === Number(idProfesor) &&
+      Number(a.id_grupo) === Number(idGrupo) &&
+      hhmm(a.hora) === hhmm(hora)
+    );
+  };
+
   const modalSalon = document.getElementById('modal-salon');
   const salonCloseBtn = document.getElementById('reg-salon-close');
 
@@ -765,8 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
         incProfesorEl.appendChild(o);
       }
     }
-    const btnQrInit = document.getElementById('btn-codigo-qr');
-    if (btnQrInit) btnQrInit.classList.add('oculto');
     modalRegistrarIncidencia.classList.add('activo');
   };
 
@@ -777,16 +799,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (incTipoEl) {
     incTipoEl.addEventListener('change', () => {
       const v = incTipoEl.value;
-      const btnQr = document.getElementById('btn-codigo-qr');
       if (v === 'ausencia_profesor') {
         if (incHoraContainer) incHoraContainer.classList.remove('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.remove('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.remove('oculto');
+        if (horarioActualEnWidget) {
+          generarOpcionesHoraSelect(incHoraEl, horarioActualEnWidget.hora_inicio, horarioActualEnWidget.hora_fin);
+        }
       } else if (v === 'reasignacion_salon') {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.remove('oculto');
         salonSeleccionadoReasignacion = null;
         if (incSalonBtn) { incSalonBtn.textContent = 'Salón: —'; incSalonBtn.classList.remove('salon-elegido'); }
@@ -794,7 +816,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
-        if (btnQr) btnQr.classList.add('oculto');
       }
     });
   }
@@ -882,6 +903,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (existeIncidenciaDuplicada(fechaDinamica, hhmm(horaRegistro), profesorSeleccionado, horarioActualEnWidget.id_grupo)) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Ya existe una incidencia registrada para esta clase en esa hora.', tipo: 'advertencia' });
+        return;
+      }
+
       try {
         await fetchJson('/ausencias', {
           method: 'POST',
@@ -921,11 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const modalCodigoQr = document.getElementById('modal-codigo-qr');
-  const btnCodigoQr = document.getElementById('btn-codigo-qr');
-  const cerrarModalCodigoQr = document.getElementById('cerrar-modal-codigo-qr');
-  if (btnCodigoQr && modalCodigoQr) btnCodigoQr.addEventListener('click', () => modalCodigoQr.classList.add('activo'));
-  if (cerrarModalCodigoQr) cerrarModalCodigoQr.addEventListener('click', () => { if (modalCodigoQr) modalCodigoQr.classList.remove('activo'); });
+
 
   const btnIrMapa = document.getElementById('btn-ir-mapa');
   if (btnIrMapa) btnIrMapa.addEventListener('click', () => { window.location.href = 'map_preP.html'; });
@@ -1034,7 +1056,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === modalHorario) modalHorario.classList.remove('activo');
     if (e.target === modalAlertas) modalAlertas.classList.remove('activo');
     if (e.target === modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo');
-    if (e.target === modalCodigoQr) modalCodigoQr.classList.remove('activo');
     if (!e.target.closest('.contenedor-menu-kebab')) {
       document.querySelectorAll('.menu-desplegable.activo').forEach(m => m.classList.remove('activo'));
     }

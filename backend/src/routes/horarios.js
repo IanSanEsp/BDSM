@@ -6,6 +6,7 @@ import {
 	listarMateriasCatalogo,
 	actualizarHorario,
 	eliminarHorario,
+	eliminarTodosHorarios,
 	buscarPorBloque,
 	reasignarSalon,
 	adelantarClase,
@@ -21,8 +22,10 @@ router.get("/profesores", listarProfesoresCatalogo);
 router.get("/materias", listarMateriasCatalogo);
 router.post("/", requireAuth, requireAdmin, crearHorario);
 router.put("/:id", requireAuth, requireAdmin, actualizarHorario); 
-router.delete("/:id", requireAuth, requireAdmin, eliminarHorario);
 
+// Eliminar TODOS los horarios (requiere prefecto) — DEBE ir antes de /:id
+router.delete("/todos", requireAuth, requirePrefecto, eliminarTodosHorarios);
+router.delete("/:id", requireAuth, requireAdmin, eliminarHorario);
 
 router.get("/por-bloque", buscarPorBloque);
 

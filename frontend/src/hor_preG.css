@@ -1677,6 +1677,50 @@ footer {
   gap: 8px;
 }
 
+.contenedor-dias-jerarquico {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-dia-jerarquico {
+  margin-left: 8px;
+}
+
+.header-dia {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f2f0ff;
+  border-radius: 8px;
+  border-left: 3px solid #7c5cbf;
+  transition: background-color 0.2s;
+}
+
+.header-dia:hover {
+  background-color: #e8e4ff;
+}
+
+.header-dia .material-symbols-outlined:first-of-type {
+  color: #7c5cbf;
+  font-size: 20px;
+}
+
+.texto-dia {
+  flex: 1;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-sobre-superficie);
+}
+
+.header-dia .icono-expandir {
+  transition: transform 0.3s ease;
+  color: #999;
+  font-size: 20px;
+}
+
 .item-grupo-jerarquico {
   margin-left: 12px;
 }
