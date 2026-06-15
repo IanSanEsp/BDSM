@@ -183,6 +183,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return claseIni <= bloqueIni && claseFin > bloqueIni;
   };
 
+  const obtenerMinutosActuales = () => {
+    const ahora = new Date();
+    return ahora.getHours() * 60 + ahora.getMinutes();
+  };
+
+  const claseEnCurso = (clase) => {
+    if (!clase) return false;
+    const [cH, cM] = String(clase.hora_inicio).split(':').map(Number);
+    const [cFH, cFM] = String(clase.hora_fin).split(':').map(Number);
+    if (isNaN(cH) || isNaN(cM) || isNaN(cFH) || isNaN(cFM)) return false;
+    const ahora = obtenerMinutosActuales();
+    const claseIni = cH * 60 + cM;
+    const claseFin = cFH * 60 + cFM;
+    return ahora >= claseIni && ahora < claseFin;
+  };
+
   const buscarDinamicoEnBloque = (idSalon, dia, bloqueId) => {
     if (!idSalon || bloqueId == null) return null;
     const diaLower = String(dia || '').toLowerCase();
@@ -192,6 +208,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (String(d?.dia || '').toLowerCase() !== diaLower) return false;
       const h = { hora_inicio: dynHoraInicio(d), hora_fin: dynHoraFin(d) };
       return claseEnBloque(h, bloqueId);
+    });
+    return candidatos.find((d) => d.id_horario_dinamico) || candidatos[0] || null;
+  };
+
+  const buscarDinamicoEnCurso = (idSalon, dia) => {
+    if (!idSalon) return null;
+    const diaLower = String(dia || '').toLowerCase();
+    const candidatos = dinamicaData.filter((d) => {
+      const salonId = Number(d?.id_salon_temporal || d?.id_salon);
+      if (salonId !== Number(idSalon)) return false;
+      if (String(d?.dia || '').toLowerCase() !== diaLower) return false;
+      const h = { hora_inicio: dynHoraInicio(d), hora_fin: dynHoraFin(d) };
+      return claseEnCurso(h);
     });
     return candidatos.find((d) => d.id_horario_dinamico) || candidatos[0] || null;
   };
@@ -243,36 +272,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = salonesData.filter(s => pisoCoincide(s));
     const ausMap = buildAusenciasMap();
     const diaActual = obtenerDiaActual();
-    const bloqueActualId = obtenerBloqueActualId();
     const ocupadosPorHorario = new Set();
     const provisionales = new Set();
 
-    if (bloqueActualId != null) {
-      for (const s of rows) {
-        const dyn = buscarDinamicoEnBloque(s.id_salon, diaActual, bloqueActualId);
-        const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
-        const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
-        if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) {
-          for (const k of nameKeysForMatch(obtenerNombreSalon(s))) provisionales.add(k);
-        }
-        if (dyn && !dynCancelada) {
-          for (const k of nameKeysForMatch(obtenerNombreSalon(s))) ocupadosPorHorario.add(k);
-          continue;
-        }
+    for (const s of rows) {
+      const dyn = buscarDinamicoEnCurso(s.id_salon, diaActual);
+      const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+      const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
+      if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) {
+        for (const k of nameKeysForMatch(obtenerNombreSalon(s))) provisionales.add(k);
       }
+      if (dyn && !dynCancelada) {
+        for (const k of nameKeysForMatch(obtenerNombreSalon(s))) ocupadosPorHorario.add(k);
+        continue;
+      }
+    }
 
-      for (const h of horariosData) {
-        if (String(h.dia).toLowerCase() !== String(diaActual).toLowerCase()) continue;
-        if (!claseEnBloque(h, bloqueActualId)) continue;
-        if (claseCancelada(h, ausMap)) continue;
-        const claseReasignada = dinamicaData.some((d) =>
-          Number(d.id_horario_fijo_detalle) === Number(h.id_horario_fijo_detalle) &&
-          Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(h.id_salon)
-        );
-        if (claseReasignada) continue;
-        const nombreSalon = obtenerNombreSalon(h);
-        for (const k of nameKeysForMatch(nombreSalon)) ocupadosPorHorario.add(k);
-      }
+    for (const h of horariosData) {
+      if (String(h.dia).toLowerCase() !== String(diaActual).toLowerCase()) continue;
+      if (!claseEnCurso(h)) continue;
+      if (claseCancelada(h, ausMap)) continue;
+      const claseReasignada = dinamicaData.some((d) =>
+        Number(d.id_horario_fijo_detalle) === Number(h.id_horario_fijo_detalle) &&
+        Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(h.id_salon)
+      );
+      if (claseReasignada) continue;
+      const nombreSalon = obtenerNombreSalon(h);
+      for (const k of nameKeysForMatch(nombreSalon)) ocupadosPorHorario.add(k);
     }
 
     const estadoPorKey = new Map();
@@ -337,31 +363,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = salonesPiso.length;
 
     const diaActual = obtenerDiaActual();
-    const bloqueActualId = obtenerBloqueActualId();
     const ausMap = buildAusenciasMap();
 
     const estadosActuales = salonesPiso.map((salon) => {
       let estado = String(salon.estado || '').trim();
-      if (bloqueActualId != null) {
-        const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
-        const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
-        const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
-        if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) return 'Provisional';
-        if (dyn && !dynCancelada) return 'Ocupado';
+      const dyn = buscarDinamicoEnCurso(salon.id_salon, diaActual);
+      const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
+      const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
+      if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) return 'Provisional';
+      if (dyn && !dynCancelada) return 'Ocupado';
 
-        const hRaw = horariosData.find(h =>
-          Number(h.id_salon) === Number(salon.id_salon) &&
-          String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
-          claseEnBloque(h, bloqueActualId)
-        );
-        const claseReasignada = hRaw && dinamicaData.some((d) =>
-          Number(d.id_horario_fijo_detalle) === Number(hRaw.id_horario_fijo_detalle) &&
-          Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(salon.id_salon)
-        );
-        const h = hRaw && !claseCancelada(hRaw, ausMap) && !claseReasignada ? hRaw : null;
-        if (h && estado.toLowerCase() === 'disponible') return 'Ocupado';
-        if (!h && estado.toLowerCase() === 'ocupado') return 'Disponible';
-      }
+      const hRaw = horariosData.find(h =>
+        Number(h.id_salon) === Number(salon.id_salon) &&
+        String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
+        claseEnCurso(h)
+      );
+      const claseReasignada = hRaw && dinamicaData.some((d) =>
+        Number(d.id_horario_fijo_detalle) === Number(hRaw.id_horario_fijo_detalle) &&
+        Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(salon.id_salon)
+      );
+      const h = hRaw && !claseCancelada(hRaw, ausMap) && !claseReasignada ? hRaw : null;
+      if (h && estado.toLowerCase() === 'disponible') return 'Ocupado';
+      if (!h && estado.toLowerCase() === 'ocupado') return 'Disponible';
       return estado || 'Disponible';
     });
 
@@ -446,7 +469,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const salonesPiso = salonesData.filter(s => pisoCoincide(s));
     const diaActual = obtenerDiaActual();
-    const bloqueActualId = obtenerBloqueActualId();
 
     const totalPaginas = Math.max(1, Math.ceil(salonesPiso.length / PAGE_SIZE));
     if (paginaActual > totalPaginas) paginaActual = totalPaginas;
@@ -459,14 +481,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const ausMap = buildAusenciasMap();
 
     paginaSalones.forEach(salon => {
-      const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
+      const dyn = buscarDinamicoEnCurso(salon.id_salon, diaActual);
       const motivoDyn = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
       const dynHorario = dyn ? horarioDesdeDinamico(dyn) : null;
       const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dynHorario ? claseCancelada(dynHorario, ausMap) : false);
       const horarioRaw = horariosData.find(h =>
         Number(h.id_salon) === Number(salon.id_salon) &&
         String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
-        claseEnBloque(h, bloqueActualId)
+        claseEnCurso(h)
       );
       const claseReasignada = horarioRaw && dinamicaData.some((d) =>
         Number(d.id_horario_fijo_detalle) === Number(horarioRaw.id_horario_fijo_detalle) &&

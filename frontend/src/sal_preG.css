@@ -99,7 +99,7 @@ td {
 /* status variants copied from hor_preG for pixel parity */
 
 .celda-exito { background-color: #f9f3f7; border-left-color: #60003E; color: #3B0024; }
-.celda-advertencia { background-color: #fffbeb; border-left-color: #f59e0b; color: #92400e; }
+.celda-advertencia { background-color: #fef3c7; border-left: 5px solid #f59e0b; color: #92400e; }
 .celda-error { background-color: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
 
 .materia-nombre { font-size: 10px; font-weight: 700; text-transform: uppercase; line-height: 1.2; }
@@ -278,4 +278,20 @@ td {
 }
 .tabla-simple tr:last-child td { border-bottom: none; }
 .tabla-simple tr:hover td { background-color: #f9fafb; }
+
+/* ── Tarjetas de alerta (incidencias / cambios / adelantos) ── */
+.tarjeta-alerta { background-color:white; padding:20px; border-radius:12px; display:flex; gap:16px; border:1px solid #f3f4f6; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom:16px; transition: transform 0.2s, box-shadow 0.2s; }
+.tarjeta-alerta:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+.alerta-icono { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.alerta-icono.error { background-color: #fef2f2; color: #ef4444; }
+.alerta-icono.advertencia { background-color: #fffbeb; color: #f59e0b; }
+.alerta-texto p:first-child { font-weight:700; color:#111827; font-size:0.95rem; margin-bottom:4px; }
+.alerta-texto p:nth-child(2) { color: #6b7280; font-size: 0.8rem; font-weight: 500; margin-bottom: 8px; }
+.alerta-texto p:last-child { color: #9ca3af; font-size: 0.8rem; font-style: italic; }
+.widget-alert-list { --alert-item-height: 88px; max-height: calc(var(--alert-item-height) * 3); overflow-y: auto; padding-right: 8px; flex: 1 1 auto; }
+.widget-alert-list .tarjeta-alerta { margin-bottom: 12px; }
+.widget-alert-list::-webkit-scrollbar { width: 10px; }
+.widget-alert-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
+.btn-ver-todas { margin: 0 16px 16px; padding: 10px; background-color: white; border: 1px solid #f1f5f9; border-radius: 8px; color: #4b5563; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.btn-ver-todas:hover { background-color: #f8fafc; border-color: #e2e8f0; }
 

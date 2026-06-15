@@ -115,21 +115,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Construir eventos por salon desde dinamicaData (y yo q no queria hacer filtros y tengo q hacer esta mrd)
     const eventosPorSalon = new Map();
     for (const d of dinamicaData) {
-      const idSalon = Number(d.id_salon_temporal ?? d.id_salon);
-      if (!idSalon) continue;
+      if (!d.id_salon) continue;
+      const idSalon = Number(d.id_salon);
       const horaInicio = hhmm(d.hora_inicio_temp ?? d.hora_inicio);
       const horaFin = hhmm(d.hora_fin_temp ?? d.hora_fin);
       const inicioH = parseInt(horaInicio.split(':')[0]);
       const finH = parseInt(horaFin.split(':')[0]);
       const numBloques = Math.max(1, finH - inicioH);
+      const esDinamico = !!d.id_horario_dinamico;
+      const salonDestino = d.id_salon_temporal && Number(d.id_salon_temporal) !== idSalon ? Number(d.id_salon_temporal) : null;
+
       if (!eventosPorSalon.has(idSalon)) eventosPorSalon.set(idSalon, []);
       eventosPorSalon.get(idSalon).push({
-        horaInicio,
-        numBloques,
+        horaInicio, numBloques,
         nombre_grupo: d.nombre_grupo || 'Grupo',
         nombre_profesor: d.nombre_profesor || 'Profesor',
-        esDinamico: !!d.id_horario_dinamico
+        esDinamico, salonDestino
       });
+
+      if (salonDestino) {
+        if (!eventosPorSalon.has(salonDestino)) eventosPorSalon.set(salonDestino, []);
+        eventosPorSalon.get(salonDestino).push({
+          horaInicio, numBloques,
+          nombre_grupo: d.nombre_grupo || 'Grupo',
+          nombre_profesor: d.nombre_profesor || 'Profesor',
+          esDinamico: false, salonDestino: null
+        });
+      }
     }
 
     salonesFiltrados.forEach(salon => {
@@ -155,9 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           const divCelda = document.createElement('div');
           divCelda.className = `celda-horario ${ev.esDinamico ? 'celda-advertencia' : 'celda-exito'}`;
-          divCelda.innerHTML = `
-            <p class="materia-nombre">${ev.nombre_grupo}</p>
-            <p class="profesor-nombre">${ev.nombre_profesor}</p>`;
+          const nombreDestino = ev.salonDestino ? (salonesData.find(s => Number(s.id_salon) === Number(ev.salonDestino))?.nombre_salon || ev.salonDestino) : '';
+          const badgeTexto = ev.salonDestino ? `→ ${nombreDestino}` : 'INCIDENCIA';
+          const badge = ev.esDinamico ? `<span style="display:inline-block;font-size:8px;font-weight:800;text-transform:uppercase;color:#92400e;background:#fde68a;padding:1px 6px;border-radius:4px;margin-bottom:4px;">${badgeTexto}</span>` : '';
+          divCelda.innerHTML = `${badge}<p class="materia-nombre">${ev.nombre_grupo}</p><p class="profesor-nombre">${ev.nombre_profesor}</p>`;
           tdHora.appendChild(divCelda);
         } else {
           const divVacia = document.createElement('div');
@@ -245,10 +258,19 @@ document.addEventListener('DOMContentLoaded', () => {
     cont.innerHTML = '';
     dinamicaData.forEach(d => {
       const hf = horariosData.find(h => h.id_horario_fijo === d.id_horario_fijo);
+      const motivo = String(d.motivo || d.motivo_cambio || '').toLowerCase();
       const salonDest = salonesData.find(s => s.id_salon === d.id_salon_temporal);
+      if (motivo.includes('adelanto')) {
+        const salonOrig = salonesData.find(s => s.id_salon === d.id_salon);
+        if (!pisoCoincide(salonOrig)) return;
+        const div = document.createElement('div'); div.className = 'tarjeta-alerta';
+        div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Adelanto: ${hf?.nombre_grupo||'Grupo'}</p><p>${d.motivo||'Adelanto'}</p></div>`;
+        cont.appendChild(div);
+        return;
+      }
       if (!pisoCoincide(salonDest)) return;
       const div = document.createElement('div'); div.className = 'tarjeta-alerta';
-      div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Cambio de salón: ${hf?.nombre_grupo||'Grupo'}</p><p>${d.motivo_cambio||''} • Nuevo: ${salonDest?.nombre_salon||'S/N'}</p></div>`;
+      div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Cambio de salón: ${hf?.nombre_grupo||'Grupo'}</p><p>${d.motivo||''} • Nuevo: ${salonDest?.nombre_salon||'S/N'}</p></div>`;
       cont.appendChild(div);
     });
     ausenciasData.forEach(a => {
@@ -280,7 +302,14 @@ document.addEventListener('DOMContentLoaded', () => {
     cuerpoHistorialAlertas.innerHTML = '';
     const alertas = [
       ...ausenciasData.filter(a => { const hf = horariosData.find(h => h.id_grupo === a.id_grupo); return pisoCoincide(salonesData.find(s => s.id_salon === hf?.id_salon)); }).map(a => ({ ...a, tipo:'ausencia' })),
-      ...dinamicaData.filter(d => pisoCoincide(salonesData.find(s => s.id_salon === d.id_salon_temporal))).map(d => ({ ...d, tipo:'cambio' }))
+      ...dinamicaData.filter(d => {
+        const motivo = String(d.motivo || d.motivo_cambio || '').toLowerCase();
+        if (motivo.includes('adelanto')) return pisoCoincide(salonesData.find(s => s.id_salon === d.id_salon));
+        return pisoCoincide(salonesData.find(s => s.id_salon === d.id_salon_temporal));
+      }).map(d => {
+        const motivo = String(d.motivo || d.motivo_cambio || '').toLowerCase();
+        return { ...d, tipo: motivo.includes('adelanto') ? 'adelanto' : 'cambio' };
+      })
     ].sort((a, b) => (b.fecha||'').localeCompare(a.fecha||''));
 
     const gruposPorFecha = {};
@@ -293,10 +322,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div'); div.className = 'tarjeta-alerta';
         if (alerta.tipo === 'ausencia') {
           div.innerHTML = `<div class="alerta-icono error"><span class="material-symbols-outlined md-20">person_off</span></div><div class="alerta-texto"><p>Ausencia: ${alerta.nombre_profesor||'Profesor'}</p><p>Grupo ${alerta.nombre_grupo||'G'} • ${alerta.hora||'S/H'}</p><p>${alerta.accion_tomada||'Sin acción'}</p></div>`;
+        } else if (alerta.tipo === 'adelanto') {
+          const hf = horariosData.find(h => h.id_horario_fijo === alerta.id_horario_fijo);
+          div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Adelanto: ${alerta.motivo||''}</p><p>Grupo ${hf?.nombre_grupo||'G'} • ${alerta.hora_inicio||''}</p></div>`;
         } else {
           const hf = horariosData.find(h => h.id_horario_fijo === alerta.id_horario_fijo);
           const sal = salonesData.find(s => s.id_salon === alerta.id_salon_temporal);
-          div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Cambio de salón: ${alerta.motivo_cambio||''}</p><p>Grupo ${hf?.nombre_grupo||'G'} • ${alerta.hora_inicio||''}</p><p>Nuevo salón: ${sal?.nombre_salon||'S/N'}</p></div>`;
+          div.innerHTML = `<div class="alerta-icono advertencia"><span class="material-symbols-outlined md-20">warning</span></div><div class="alerta-texto"><p>Cambio de salón: ${alerta.motivo||''}</p><p>Grupo ${hf?.nombre_grupo||'G'} • ${alerta.hora_inicio||''}</p><p>Nuevo salón: ${sal?.nombre_salon||'S/N'}</p></div>`;
         }
         cuerpoHistorialAlertas.appendChild(div);
       });

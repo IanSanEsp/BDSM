@@ -179,8 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function clasificarEventoPorMotivo(motivo) {
     const m = String(motivo || '').toLowerCase();
-    // Amarillo: adelanto de clase
-    if (m.includes('adelant')) return 'advertencia';
+    // Amarillo: adelanto o reasignación
+    if (m.includes('adelant') || m.includes('reasign')) return 'advertencia';
     // Rojo: cancelación / suspensión
     if (m.includes('cancel') || m.includes('cancela') || m.includes('suspend') || m.includes('sin clase')) return 'error';
     // Vino: normal
@@ -231,8 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     for (const r of tablaDinamicaRows || []) {
-      const idSalonDestino = r.id_salon_temporal ?? r.id_salon;
-      if (!idSalonDestino) continue;
+      if (!r.id_salon) continue;
 
       const horaInicio = r.hora_inicio_temp || r.hora_inicio;
       const horaFin = r.hora_fin_temp || r.hora_fin;
@@ -256,11 +255,27 @@ document.addEventListener('DOMContentLoaded', () => {
         nombre_grupo: r.nombre_grupo,
         nombre_profesor: r.nombre_profesor,
         esDinamico: !!r.id_horario_dinamico,
-        variante: hayAusenciaProfesor ? 'error' : r.id_horario_dinamico ? clasificarEventoPorMotivo(r.motivo) : 'exito'
+        variante: hayAusenciaProfesor ? 'error' : r.id_horario_dinamico ? 'advertencia' : 'exito',
+        salonDestino: r.id_salon_temporal && Number(r.id_salon_temporal) !== Number(r.id_salon) ? r.id_salon_temporal : null
       };
 
-      if (!porSalon.has(idSalonDestino)) porSalon.set(idSalonDestino, []);
-      porSalon.get(idSalonDestino).push(ev);
+      const idSalon = Number(r.id_salon);
+      if (!porSalon.has(idSalon)) porSalon.set(idSalon, []);
+      porSalon.get(idSalon).push(ev);
+
+      if (r.id_salon_temporal && Number(r.id_salon_temporal) !== idSalon) {
+        const evDest = {
+          startBlock, span,
+          nombre_grupo: r.nombre_grupo,
+          nombre_profesor: r.nombre_profesor,
+          esDinamico: false,
+          variante: 'exito',
+          salonDestino: null
+        };
+        const idDest = Number(r.id_salon_temporal);
+        if (!porSalon.has(idDest)) porSalon.set(idDest, []);
+        porSalon.get(idDest).push(evDest);
+      }
     }
 
     // ordenar y resolver colisiones por bloque inicio (preferir dinámico)
@@ -288,7 +303,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const cambios = [];
     for (const r of tablaDinamicaRows || []) {
       if (!r.id_horario_dinamico) continue;
-      if (!r.id_salon_temporal) continue;
+      const motivo = String(r.motivo || r.motivo_cambio || '').toLowerCase();
+      if (!r.id_salon_temporal || Number(r.id_salon_temporal) === Number(r.id_salon)) {
+        if (!motivo.includes('adelanto')) continue;
+        cambios.push({
+          tipo: 'adelanto',
+          fecha,
+          hora: String(r.hora_inicio_temp || r.hora_inicio || '').slice(0, 5),
+          nombre_grupo: r.nombre_grupo,
+          motivo: r.motivo || 'Adelanto'
+        });
+        continue;
+      }
       if (Number(r.id_salon_temporal) === Number(r.id_salon)) continue;
       const salonTemp = salonesData.find((s) => Number(s.id_salon) === Number(r.id_salon_temporal));
       cambios.push({
@@ -353,7 +379,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
           const divCelda = document.createElement('div');
           divCelda.className = `celda-horario ${claseColor}`;
+          const nombreDestino = ev.salonDestino ? (salonesData.find(s => Number(s.id_salon) === Number(ev.salonDestino))?.numero_salon || ev.salonDestino) : '';
+          const badgeTexto = ev.salonDestino ? `→ ${nombreDestino}` : 'INCIDENCIA';
+          const badge = ev.esDinamico ? `<span style="display:inline-block;font-size:8px;font-weight:800;text-transform:uppercase;color:#92400e;background:#fde68a;padding:1px 6px;border-radius:4px;margin-bottom:4px;">${badgeTexto}</span>` : '';
           divCelda.innerHTML = `
+            ${badge}
             <p class="materia-nombre">${ev.nombre_grupo || 'Grupo'}</p>
             <p class="profesor-nombre">${ev.nombre_profesor || 'Profesor'}</p>
           `;
@@ -482,14 +512,25 @@ document.addEventListener('DOMContentLoaded', () => {
     cambios.forEach((c) => {
       const div = document.createElement('div');
       div.className = 'tarjeta-alerta';
-      div.innerHTML = `
-        <div class="alerta-icono advertencia">
-          <span class="material-symbols-outlined md-20">warning</span>
-        </div>
-        <div class="alerta-texto">
-          <p>Cambio de salón: ${c.nombre_grupo || 'Grupo'}</p>
-          <p>${c.motivo || ''}${c.salon_temporal ? ` • Nuevo: ${c.salon_temporal}` : ''}</p>
-        </div>`;
+      if (c.tipo === 'adelanto') {
+        div.innerHTML = `
+          <div class="alerta-icono advertencia">
+            <span class="material-symbols-outlined md-20">warning</span>
+          </div>
+          <div class="alerta-texto">
+            <p>Adelanto: ${c.nombre_grupo || 'Grupo'}</p>
+            <p>${c.motivo || 'Adelanto'}</p>
+          </div>`;
+      } else {
+        div.innerHTML = `
+          <div class="alerta-icono advertencia">
+            <span class="material-symbols-outlined md-20">warning</span>
+          </div>
+          <div class="alerta-texto">
+            <p>Cambio de salón: ${c.nombre_grupo || 'Grupo'}</p>
+            <p>${c.motivo || ''}${c.salon_temporal ? ` • Nuevo: ${c.salon_temporal}` : ''}</p>
+          </div>`;
+      }
       cont.appendChild(div);
     });
 
@@ -558,6 +599,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>Incidencia: ${it.nombre_profesor || 'Profesor'}</p>
                 <p>Grupo ${it.nombre_grupo || 'G'} • ${it.hora || 'S/H'}</p>
                 <p>${it.accion_tomada || 'Sin acción registrada'}</p>
+              </div>`;
+          } else if (it.tipo === 'adelanto') {
+            div.innerHTML = `
+              <div class="alerta-icono advertencia">
+                <span class="material-symbols-outlined md-20">warning</span>
+              </div>
+              <div class="alerta-texto">
+                <p>Adelanto: ${it.motivo || ''}</p>
+                <p>Grupo ${it.nombre_grupo || 'G'} • ${it.hora || ''}</p>
               </div>`;
           } else {
             div.innerHTML = `
