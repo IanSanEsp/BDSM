@@ -1,4 +1,4 @@
-import { DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, paintSessionHeader, clearSession } from './map_preG_shared.js';
+import { DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, setSessionUser, paintSessionHeader, clearSession } from './map_preG_shared.js';
 
 const apiBase = resolveApiBase() || DEFAULT_API_URL;
 
@@ -88,9 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnGuardar) {
     btnGuardar.addEventListener('click', async () => {
-      const nombre = document.getElementById('edit-nombre')?.value || '';
-      const correo = document.getElementById('edit-correo')?.value || '';
-      const turno = document.getElementById('edit-turno')?.value || '';
+      const nombre = String(document.getElementById('edit-nombre')?.value || '').trim();
+      const correo = String(document.getElementById('edit-correo')?.value || '').trim();
+      const turno = String(document.getElementById('edit-turno')?.value || '').trim();
+      if (!nombre || !correo || !turno) {
+        mostrarTostada({ titulo: 'Aviso', mensaje: 'Completa nombre, correo y turno', tipo: 'advertencia' });
+        return;
+      }
 
       try {
         await fetchJson(`/usuarios/me`, {
@@ -98,19 +102,39 @@ document.addEventListener('DOMContentLoaded', () => {
           auth: true,
           body: { nombre, correo, turno }
         });
-      } catch (e) { console.warn('Error guardando perfil:', e); }
+      } catch (e) {
+        mostrarTostada({ titulo: 'Error', mensaje: 'No se pudo guardar. Revisa conexión.', tipo: 'error' });
+        return;
+      }
 
+      const u = getSessionUser();
+      const updated = { ...u, nombre, correo, turno };
+      setSessionUser(updated);
+      paintSessionHeader(updated);
+
+      const iniciales = ((updated.nombre || '').split(' ')[0]?.[0] || '') + ((updated.nombre || '').split(' ')[1]?.[0] || '');
       const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      const setInput = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
       setVal('vista-nombre', nombre);
       setVal('vista-correo', correo);
       setVal('vista-turno', turno);
       setVal('nombre-perfil-grande', nombre);
       setVal('correo-perfil-grande', correo);
+      const avatarGrande = document.getElementById('avatar-grande-perfil');
+      if (avatarGrande) avatarGrande.textContent = iniciales;
+      setInput('edit-nombre', nombre);
+      setInput('edit-correo', correo);
+      const editTurno = document.getElementById('edit-turno');
+      if (editTurno) {
+        Array.from(editTurno.options).forEach(opt => { opt.selected = opt.value === turno; });
+      }
 
       vistaInfo?.classList.remove('oculto');
       edicionInfo?.classList.add('oculto');
       btnGuardar?.classList.add('oculto');
       btnEditar?.classList.remove('oculto');
+
+      mostrarTostada({ titulo: 'Éxito', mensaje: 'Perfil actualizado correctamente', tipo: 'exito' });
     });
   }
 

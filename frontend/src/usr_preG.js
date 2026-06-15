@@ -418,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <div class="campo-info-editable">
           <span class="campo-info-label">Contraseña</span>
-          <input type="password" id="edit-contrasena" class="campo-editable" value="" placeholder="(dejar vacío para no cambiar)" />
+          <input type="password" id="edit-contrasena" class="campo-editable" value="" placeholder="(opcional)" />
         </div>
       </div>
 

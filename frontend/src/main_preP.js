@@ -2,6 +2,7 @@ import {
   DEFAULT_API_URL, resolveApiBase, getSessionToken, getSessionUser, clearSession, paintSessionHeader, getInitials,
   LAYOUT_PISOS, COLORES, keySalonName, stripSalonPrefix, normalizarEstado, getLocalDateISO
 } from './map_preG_shared.js';
+import { initSalonSelectorMap } from './sel_salon_map.js';
 
 const apiBase = resolveApiBase() || DEFAULT_API_URL;
 
@@ -185,19 +186,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const buscarDinamicoEnBloque = (idSalon, dia, bloqueId) => {
     if (!idSalon || bloqueId == null) return null;
     const diaLower = String(dia || '').toLowerCase();
-    return dinamicaData.find((d) => {
+    const candidatos = dinamicaData.filter((d) => {
       const salonId = Number(d?.id_salon_temporal || d?.id_salon);
       if (salonId !== Number(idSalon)) return false;
       if (String(d?.dia || '').toLowerCase() !== diaLower) return false;
       const h = { hora_inicio: dynHoraInicio(d), hora_fin: dynHoraFin(d) };
       return claseEnBloque(h, bloqueId);
-    }) || null;
+    });
+    return candidatos.find((d) => d.id_horario_dinamico) || candidatos[0] || null;
   };
 
   const buildAusenciasMap = () => {
     const map = new Map();
     const hoy = hoyISO();
     for (const a of ausenciasData) {
+      if (String(a?.accion_tomada || '').trim() === 'reasignacion_salon') continue;
       const fechaRaw = String(a?.fecha || '').slice(0, 10);
       const fecha = fechaRaw || hoy;
       if (fecha !== hoy) continue;
@@ -248,8 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const s of rows) {
         const dyn = buscarDinamicoEnBloque(s.id_salon, diaActual, bloqueActualId);
         const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
-        const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
-        if (dyn && !dynCancelada && motivo.includes('adelanto')) {
+        const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
+        if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) {
           for (const k of nameKeysForMatch(obtenerNombreSalon(s))) provisionales.add(k);
         }
         if (dyn && !dynCancelada) {
@@ -262,6 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (String(h.dia).toLowerCase() !== String(diaActual).toLowerCase()) continue;
         if (!claseEnBloque(h, bloqueActualId)) continue;
         if (claseCancelada(h, ausMap)) continue;
+        const claseReasignada = dinamicaData.some((d) =>
+          Number(d.id_horario_fijo_detalle) === Number(h.id_horario_fijo_detalle) &&
+          Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(h.id_salon)
+        );
+        if (claseReasignada) continue;
         const nombreSalon = obtenerNombreSalon(h);
         for (const k of nameKeysForMatch(nombreSalon)) ocupadosPorHorario.add(k);
       }
@@ -337,8 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (bloqueActualId != null) {
         const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
         const motivo = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
-        const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
-        if (dyn && !dynCancelada && motivo.includes('adelanto')) return 'Provisional';
+        const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
+        if (dyn && !dynCancelada && (motivo.includes('adelanto') || motivo.includes('reasignaci'))) return 'Provisional';
         if (dyn && !dynCancelada) return 'Ocupado';
 
         const hRaw = horariosData.find(h =>
@@ -346,7 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
           String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
           claseEnBloque(h, bloqueActualId)
         );
-        const h = hRaw && !claseCancelada(hRaw, ausMap) ? hRaw : null;
+        const claseReasignada = hRaw && dinamicaData.some((d) =>
+          Number(d.id_horario_fijo_detalle) === Number(hRaw.id_horario_fijo_detalle) &&
+          Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(salon.id_salon)
+        );
+        const h = hRaw && !claseCancelada(hRaw, ausMap) && !claseReasignada ? hRaw : null;
         if (h && estado.toLowerCase() === 'disponible') return 'Ocupado';
         if (!h && estado.toLowerCase() === 'ocupado') return 'Disponible';
       }
@@ -450,13 +462,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const dyn = buscarDinamicoEnBloque(salon.id_salon, diaActual, bloqueActualId);
       const motivoDyn = String(dyn?.motivo || dyn?.motivo_cambio || '').toLowerCase();
       const dynHorario = dyn ? horarioDesdeDinamico(dyn) : null;
-      const dynCancelada = dynHorario ? claseCancelada(dynHorario, ausMap) : false;
+      const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dynHorario ? claseCancelada(dynHorario, ausMap) : false);
       const horarioRaw = horariosData.find(h =>
         Number(h.id_salon) === Number(salon.id_salon) &&
         String(h.dia).toLowerCase() === diaActual.toLowerCase() &&
         claseEnBloque(h, bloqueActualId)
       );
-      const horarioBase = horarioRaw && !claseCancelada(horarioRaw, ausMap)
+      const claseReasignada = horarioRaw && dinamicaData.some((d) =>
+        Number(d.id_horario_fijo_detalle) === Number(horarioRaw.id_horario_fijo_detalle) &&
+        Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(salon.id_salon)
+      );
+      const horarioBase = horarioRaw && !claseCancelada(horarioRaw, ausMap) && !claseReasignada
         ? horarioRaw
         : null;
       const horarioActual = dyn && !dynCancelada
@@ -466,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const nombreSalon = obtenerNombreSalon(salon);
 
       let estadoVisual = String(salon.estado || '').toLowerCase();
-      if (!dynCancelada && dyn && motivoDyn.includes('adelanto')) {
+      if (!dynCancelada && dyn && dyn.id_horario_dinamico) {
         estadoVisual = 'provisional';
       } else if (horarioActual && estadoVisual === 'disponible') {
         estadoVisual = 'ocupado';
@@ -584,13 +600,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const ausMap = buildAusenciasMap();
     bloquesHorarios.forEach(bloque => {
       const dyn = buscarDinamicoEnBloque(salonSeleccionado.id_salon, diaSeleccionadoModal, bloque.id);
-      const dynCancelada = dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false;
-      const h = (dyn && !dynCancelada) ? { ...dyn, hora_inicio: dynHoraInicio(dyn), hora_fin: dynHoraFin(dyn) }
+      const dynCancelada = (dyn && dyn.id_horario_dinamico) ? false : (dyn ? claseCancelada(horarioDesdeDinamico(dyn), ausMap) : false);
+      const hRaw = (dyn && !dynCancelada) ? { ...dyn, hora_inicio: dynHoraInicio(dyn), hora_fin: dynHoraFin(dyn) }
         : horariosData.find(h =>
             Number(h.id_salon) === Number(salonSeleccionado.id_salon) &&
             String(h.dia).toLowerCase() === String(diaSeleccionadoModal).toLowerCase() &&
             claseEnBloque(h, bloque.id)
           );
+      const claseReasignadaModal = hRaw && !(dyn && !dynCancelada) && dinamicaData.some((d) =>
+        Number(d.id_horario_fijo_detalle) === Number(hRaw.id_horario_fijo_detalle) &&
+        Number(d.id_salon_temporal) && Number(d.id_salon_temporal) !== Number(salonSeleccionado.id_salon)
+      );
+      const h = claseReasignadaModal ? null : hRaw;
       const hFinal = h && !(dyn && !dynCancelada) ? (claseCancelada(h, ausMap) ? null : h) : h;
       const fila = document.createElement('tr');
       if (hFinal) {
@@ -640,8 +661,91 @@ document.addEventListener('DOMContentLoaded', () => {
   const incProfesorContainer = document.getElementById('inc-profesor-container');
   const incProfesorEl = document.getElementById('inc-profesor');
   const incSalonContainer = document.getElementById('inc-salon-container');
-  const incSalonSelect = document.getElementById('inc-salon-select');
+  const incSalonBtn = document.getElementById('inc-salon-btn');
   let horarioActualEnWidget = null;
+  let salonModoSeleccion = 'registro';
+  let salonSeleccionadoReasignacion = null;
+  let salonSelectorMapApi = null;
+
+  const modalSalon = document.getElementById('modal-salon');
+  const salonCloseBtn = document.getElementById('reg-salon-close');
+
+  const miniSVGSalon = (layoutData, fillColor, strokeColor) => {
+    if (!layoutData) return '';
+    const PAD = 8;
+    let vbX, vbY, vbW, vbH, shapeEl;
+    if (layoutData.puntos) {
+      const pts = layoutData.puntos.trim().split(/\s+/).map(p => p.split(',').map(Number));
+      vbX = Math.min(...pts.map(p => p[0])); vbY = Math.min(...pts.map(p => p[1]));
+      vbW = Math.max(...pts.map(p => p[0])) - vbX; vbH = Math.max(...pts.map(p => p[1])) - vbY;
+      shapeEl = `<polygon points="${layoutData.puntos}" />`;
+    } else {
+      vbX = layoutData.x; vbY = layoutData.y; vbW = layoutData.w; vbH = layoutData.h;
+      shapeEl = `<rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" rx="6" />`;
+    }
+    const sw = Math.max(vbW, vbH) * 0.035;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX - PAD} ${vbY - PAD} ${vbW + PAD * 2} ${vbH + PAD * 2}" style="width:100%;height:100%;display:block;" preserveAspectRatio="xMidYMid meet">${shapeEl.replace('/>', `fill="${fillColor}" fill-opacity="0.30" stroke="${strokeColor}" stroke-width="${sw}" stroke-linejoin="round" />`)}</svg>`;
+  };
+
+  const diaDesdeFecha = (fechaISO) => {
+    const d = new Date(`${fechaISO}T00:00:00`);
+    const dow = d.getDay();
+    const map = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    return map[dow] || null;
+  };
+
+  const actualizarBotonSalonInc = (sel) => {
+    if (!incSalonBtn) return;
+    const salon = sel?.raw;
+    const layoutData = sel?.layout;
+    if (!salon) { incSalonBtn.textContent = 'Salón: —'; incSalonBtn.classList.remove('salon-elegido'); return; }
+    const estadoNorm = String(salon.estado || '').toLowerCase();
+    let badgeClass = 'sin-estado', fillColor = '#60003E', strokeColor = '#60003E', dotColor = '#60003E', estadoLabel = salon.estado || 'Sin estado';
+    if (estadoNorm.includes('disp')) { badgeClass = 'disponible'; fillColor = '#10b981'; strokeColor = '#059669'; dotColor = '#16a34a'; }
+    else if (estadoNorm.includes('ocup')) { badgeClass = 'ocupado'; fillColor = '#ef4444'; strokeColor = '#dc2626'; dotColor = '#dc2626'; }
+    else if (estadoNorm.includes('mante')) { badgeClass = 'mantenimiento'; fillColor = '#94a3b8'; strokeColor = '#64748b'; dotColor = '#94a3b8'; }
+    const pisoLabel = salon.piso !== undefined && salon.piso !== null ? `Piso ${salon.piso}` : '';
+    const tipoLabel = salon.tipo ? ` · ${salon.tipo}` : '';
+    const miniSvg = miniSVGSalon(layoutData, fillColor, strokeColor);
+    incSalonBtn.classList.add('salon-elegido');
+    incSalonBtn.innerHTML = `
+      <div class="salon-elegido-contenido">
+        <div class="salon-elegido-shape">${miniSvg}</div>
+        <div class="salon-elegido-info">
+          <span class="salon-elegido-nombre">${sel?.numero_salon || salon.numero_salon || 'Salón'}</span>
+          <span class="salon-elegido-sub">${pisoLabel}${tipoLabel}</span>
+        </div>
+        <div class="salon-elegido-derecha">
+          <span class="badge-estado ${badgeClass}">
+            <span class="dot-estado" style="background:${dotColor};"></span>
+            ${estadoLabel}
+          </span>
+          <span class="salon-elegido-cambiar">Cambiar salón</span>
+        </div>
+      </div>`;
+  };
+
+  const abrirModalSalonConContexto = (ctx) => {
+    if (!modalSalon) return;
+    modalSalon.classList.add('activo');
+    const mapEl = document.getElementById('reg-salon-map');
+    if (mapEl && !salonSelectorMapApi) {
+      initSalonSelectorMap({
+        rootEl: modalSalon,
+        mapEl,
+        availabilityContext: ctx,
+        onSelect: (sel) => {
+          if (salonModoSeleccion === 'reasignacion') {
+            salonSeleccionadoReasignacion = sel;
+            modalSalon.classList.remove('activo');
+            actualizarBotonSalonInc(sel);
+          }
+        }
+      }).then((api) => { salonSelectorMapApi = api; }).catch((err) => { console.error('No se pudo inicializar el mapa de salones', err); });
+    } else {
+      salonSelectorMapApi?.setAvailabilityContext?.(ctx).catch?.(() => {});
+    }
+  };
 
   const abrirModalIncidencia = (salon, horario) => {
     if (!modalRegistrarIncidencia) return;
@@ -649,6 +753,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (formRegistrarIncidencia) formRegistrarIncidencia.reset();
     if (incHoraContainer) incHoraContainer.classList.add('oculto');
     if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
+    if (incSalonContainer) incSalonContainer.classList.add('oculto');
+    salonSeleccionadoReasignacion = null;
+    if (incSalonBtn) { incSalonBtn.textContent = 'Salón: —'; incSalonBtn.classList.remove('salon-elegido'); }
     if (incProfesorEl) {
       incProfesorEl.innerHTML = '<option value="">Seleccionar Profesor</option>';
       if (horarioActualEnWidget && horarioActualEnWidget.nombre_profesor) {
@@ -664,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   if (cerrarModalRegistrar) {
-    cerrarModalRegistrar.addEventListener('click', () => { if (modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo'); });
+    cerrarModalRegistrar.addEventListener('click', () => { if (modalRegistrarIncidencia) modalRegistrarIncidencia.classList.remove('activo'); salonSeleccionadoReasignacion = null; });
   }
 
   if (incTipoEl) {
@@ -680,24 +787,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (btnQr) btnQr.classList.add('oculto');
-        if (incSalonSelect && salonesData) {
-          incSalonSelect.innerHTML = '<option value="">Seleccionar Salón</option>';
-          const salonActualId = Number(horarioActualEnWidget?.id_salon);
-          salonesData.forEach(s => {
-            if (Number(s.id_salon) === salonActualId) return;
-            const o = document.createElement('option');
-            o.value = Number(s.id_salon);
-            o.textContent = s.nombre_salon || `Salón ${s.id_salon}`;
-            incSalonSelect.appendChild(o);
-          });
-        }
         if (incSalonContainer) incSalonContainer.classList.remove('oculto');
+        salonSeleccionadoReasignacion = null;
+        if (incSalonBtn) { incSalonBtn.textContent = 'Salón: —'; incSalonBtn.classList.remove('salon-elegido'); }
       } else {
         if (incHoraContainer) incHoraContainer.classList.add('oculto');
         if (incProfesorContainer) incProfesorContainer.classList.add('oculto');
         if (incSalonContainer) incSalonContainer.classList.add('oculto');
         if (btnQr) btnQr.classList.add('oculto');
       }
+    });
+  }
+
+  if (incSalonBtn) {
+    incSalonBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!horarioActualEnWidget) { mostrarTostada({ titulo: 'Error', mensaje: 'No hay horario seleccionado', tipo: 'error' }); return; }
+      salonModoSeleccion = 'reasignacion';
+      const ctx = {
+        dia: diaDesdeFecha(hoyISO()),
+        hora_inicio: horarioActualEnWidget.hora_inicio || '',
+        hora_fin: horarioActualEnWidget.hora_fin || ''
+      };
+      abrirModalSalonConContexto(ctx);
+    });
+  }
+
+  if (salonCloseBtn && modalSalon) {
+    salonCloseBtn.addEventListener('click', () => {
+      modalSalon.classList.remove('activo');
+      const tt = document.querySelector('.sel-tooltip');
+      if (tt) tt.style.display = 'none';
     });
   }
 
@@ -715,16 +835,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (tipo === 'reasignacion_salon') {
-        const idSalonNuevo = Number(incSalonSelect?.value);
-        if (!idSalonNuevo || !horarioActualEnWidget?.id_horario_fijo_detalle) {
-          mostrarTostada({ titulo: 'Aviso', mensaje: idSalonNuevo ? 'No se pudo identificar la clase.' : 'Selecciona un salón de destino.', tipo: 'advertencia' });
+        if (!salonSeleccionadoReasignacion || !horarioActualEnWidget?.id_horario_fijo_detalle) {
+          mostrarTostada({ titulo: 'Aviso', mensaje: salonSeleccionadoReasignacion ? 'No se pudo identificar la clase.' : 'Selecciona un salón de destino.', tipo: 'advertencia' });
           return;
         }
         try {
           await fetchJson(`/horarios/${horarioActualEnWidget.id_horario_fijo_detalle}/reasignar-salon`, {
             method: 'POST',
             auth: true,
-            body: { fecha: hoyISO(), id_salon_temporal: idSalonNuevo }
+            body: { fecha: hoyISO(), id_salon_temporal: Number(salonSeleccionadoReasignacion.id_salon) }
           });
           const fecha = hoyISO();
           const [salonesRes, dinamicaRes] = await Promise.all([
@@ -737,6 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
           renderizarAlertas();
           renderizarEstadisticas();
           actualizarMapaPreview();
+          salonSeleccionadoReasignacion = null;
           mostrarTostada({ titulo: 'Éxito', mensaje: 'Salón reasignado correctamente.', tipo: 'exito' });
           modalRegistrarIncidencia.classList.remove('activo');
           formRegistrarIncidencia.reset();

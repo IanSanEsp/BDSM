@@ -17,7 +17,7 @@ function horarioGrupoTemplate(data) {
     porDia[h.dia].push(h);
   }
 
-  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
   for (const dia of orden) {
     if (!porDia[dia]) continue;
     res += `*${dia}:*\n`;
@@ -45,7 +45,7 @@ function horarioProfesorTemplate(data) {
     porDia[h.dia].push(h);
   }
 
-  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
   for (const dia of orden) {
     if (!porDia[dia]) continue;
     res += `*${dia}:*\n`;
@@ -64,7 +64,7 @@ function horarioSalonTemplate(data) {
   const salon = data[0].nombre_salon;
   let res = `📋 *Ocupación del ${salon}:*\n\n`;
 
-  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+  const orden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
   for (const dia of orden) {
     const clases = data.filter(h => h.dia === dia);
     if (clases.length === 0) continue;

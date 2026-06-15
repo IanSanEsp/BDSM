@@ -35,7 +35,7 @@ REGLAS IMPORTANTES:
 
 let contextCache = null;
 let contextCacheTime = 0;
-const CACHE_TTL = 30000; // 30 segundazos
+const CACHE_TTL = 30000; // 30seg
 
 async function getCachedContext() {
   const now = Date.now();

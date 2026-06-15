@@ -37,7 +37,7 @@ export async function getHorarioGrupo(grupo) {
     LEFT JOIN Profesores p2 ON hf.id_auxiliar = p2.id_profesor
     LEFT JOIN Usuarios u2 ON p2.id_profesor = u2.id_usuarios
     WHERE g.nombre_grupo LIKE ?
-    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio
+    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio
   `, [`%${grupo}%`]);
   return rows;
 }
@@ -54,7 +54,7 @@ export async function getHorarioProfesor(profesor) {
     JOIN Profesores p ON hf.id_profesor = p.id_profesor
     JOIN Usuarios u ON p.id_profesor = u.id_usuarios
     WHERE u.nombre LIKE ?
-    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio
+    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio
   `, [`%${profesor}%`]);
   return rows;
 }
@@ -71,7 +71,7 @@ export async function getHorarioSalon(salon) {
     JOIN Profesores p ON hf.id_profesor = p.id_profesor
     JOIN Usuarios u ON p.id_profesor = u.id_usuarios
     WHERE s.nombre_salon LIKE ?
-    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio
+    ORDER BY FIELD(hf.dia, 'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio
   `, [`%${salon}%`]);
   return rows;
 }

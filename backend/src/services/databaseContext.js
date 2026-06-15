@@ -60,7 +60,7 @@ export async function buildDatabaseContext() {
     JOIN Usuarios u ON p.id_profesor = u.id_usuarios
     LEFT JOIN Profesores p2 ON hf.id_auxiliar = p2.id_profesor
     LEFT JOIN Usuarios u2 ON p2.id_profesor = u2.id_usuarios
-    ORDER BY FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes'), hf.hora_inicio
+    ORDER BY FIELD(hf.dia,'Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'), hf.hora_inicio
   `);
 
   //Consexo horario dinamico
@@ -92,7 +92,7 @@ export async function buildDatabaseContext() {
   //Consexo filtrado para el hoy
   const horarioHoy = horarioCompleto.filter(h => h.dia === dia);
 
-  //Ocupacion: combinar horario_fijo + estado manual de la tabla Salones
+  //Ocupacion combinar horario_fijo y estado manual de la tabla Salones
   const ocupadosHorario = horarioHoy.filter(h => h.bloque_horario === bloqueActual).map(h => ({
     salon: h.nombre_salon, piso: h.piso, grupo: h.nombre_grupo,
     materia: h.nombre_materia, profesor: h.profesor,
@@ -136,7 +136,7 @@ export async function buildDatabaseContext() {
     ahora: {
       fecha: fecha, dia_semana: dia, hora: horaActual,
       bloque_actual: bloqueActual,
-      es_fin_de_semana: dia === 'Sabado' || dia === 'Domingo'
+      es_fin_de_semana: dia === 'Domingo'
     },
     resumen: {
       total_grupos: grupos.length,

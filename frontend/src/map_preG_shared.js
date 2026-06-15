@@ -1,4 +1,4 @@
-export const DEFAULT_API_URL = 'https://bdsm-production-8774.up.railway.app/api';
+export const DEFAULT_API_URL = 'http://localhost:3000/api';
 //http://localhost:3000/api
 //https://bdsm-production-8774.up.railway.app/api
 export const TOKEN_KEY = 'bdsm_token';
@@ -105,8 +105,7 @@ export const LAYOUT_PISOS = {
         puntos: '5660,40  6815,40  6815,860  5943,860  5943,1095  5660,1095',
         tipo: 'Aula'
       },
-      { nombre: 'Laboratorio de Computacion Basica I', x: 28, y: 2040, w: 865, h: 1250, tipo: 'Laboratorio' },
-      { nombre: 'Laboratorio de Computacion Basica II', x: 900, y: 2040, w: 835, h: 970, tipo: 'Laboratorio' },
+      { nombre: 'Laboratorio de Computacion Basica I-II', puntos: '28,2040  1735,2040  1735,3010  900,3010  900,3290  28,3290', tipo: 'Laboratorio' },
       { nombre: 'Salón 23', x: 1740, y: 2040, w: 865, h: 970, tipo: 'Aula' },
       { nombre: 'Salón 22', x: 2610, y: 2040, w: 953, h: 970, tipo: 'Aula' },
       { nombre: 'Aula Interactiva', x: 3845, y: 2040, w: 1425, h: 970, tipo: 'Laboratorio' },

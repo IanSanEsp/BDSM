@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     if (lower.startsWith('mié') || lower.startsWith('mie')) return 'Miercoles';
     if (lower.startsWith('jue')) return 'Jueves';
     if (lower.startsWith('vie')) return 'Viernes';
+    if (lower.startsWith('sá') || lower.startsWith('sab')) return 'Sabado';
 
     // Fallback: capitalizar primera letra
     return s.charAt(0).toUpperCase() + s.slice(1);
@@ -358,13 +359,13 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     const d = new Date();
     const dow = d.getDay();
     const map = [
-      'Viernes',
+      'Sabado',
       'Lunes',
       'Martes',
       'Miercoles',
       'Jueves',
       'Viernes',
-      'Viernes'
+      'Sabado'
     ];
     return map[dow] || 'Lunes';
   };
@@ -813,7 +814,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
           await cargarDatosDinamica(fechaHoyISO());
           const dia = diaDesdeFecha(fechaDinamica);
-          if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+          if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
             diaSeleccionadoTabla = dia;
           }
           renderizarAdelantos();
@@ -855,7 +856,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
 
       await cargarDatosDinamica(fechaHoyISO());
       const dia = diaDesdeFecha(fechaDinamica);
-      if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+      if (['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
         diaSeleccionadoTabla = dia;
       }
       renderizarAdelantos();
@@ -912,7 +913,7 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
     if (modoVista !== 'dinamica') return;
 
     const dia = diaDesdeFecha(fechaDinamica);
-    if (!dia || !['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'].includes(dia)) {
+    if (!dia || !['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'].includes(dia)) {
       const empty = document.createElement('div');
       empty.className = 'tarjeta-adelanto';
       empty.innerHTML = `

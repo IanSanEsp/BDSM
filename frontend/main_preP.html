@@ -8,6 +8,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="src/main_preG.css">
       <link rel="stylesheet" href="src/tostada.css">
+      <style>
+        .salon-selector-btn { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:14px 18px; border-radius:10px; border:1px solid #e2e8f0; background-color:white; color:#1e293b; font-weight:600; cursor:pointer; min-height:76px; font-size:1.05rem; text-align:left; }
+        .salon-selector-btn.salon-elegido { border-color:#e2e8f0; background:#fff; padding:10px 14px; min-height:72px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+        .salon-elegido-contenido { display:flex; align-items:center; gap:12px; width:100%; }
+        .salon-elegido-shape { width:64px; height:52px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f8f9fb; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; padding:4px; }
+        .salon-elegido-info { flex:1; display:flex; flex-direction:column; gap:2px; text-align:left; min-width:0; }
+        .salon-elegido-nombre { font-size:1rem; font-weight:800; color:#1a1c1c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .salon-elegido-sub { font-size:0.72rem; color:#64748b; font-weight:500; }
+        .salon-elegido-derecha { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+        .salon-selector-btn .badge-estado { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:99px; font-size:0.68rem; font-weight:700; }
+        .salon-selector-btn .badge-estado .dot-estado { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+        .salon-selector-btn .badge-estado.disponible { background:#dcfce7; color:#15803d; }
+        .salon-selector-btn .badge-estado.ocupado { background:#fee2e2; color:#b91c1c; }
+        .salon-selector-btn .badge-estado.mantenimiento { background:#f1f5f9; color:#475569; }
+        .salon-elegido-cambiar { font-size:0.7rem; color:var(--color-primario); font-weight:700; text-decoration:underline; cursor:pointer; }
+        #modal-salon { z-index:1002; }
+        #modal-salon .modal-contenido { max-width:70vw; width:70vw; height:80vh; max-height:80vh; }
+        .sel-salon-layout { display:grid; grid-template-rows:1fr auto; gap:12px; height:calc(80vh - 120px); padding:12px; }
+        .sel-mapa-contenedor { position:relative; width:100%; height:100%; overflow:hidden; border-radius:12px; border:1px solid #d1d5db; background:#f8f9fb; }
+        .sel-cargando { display:flex; align-items:center; justify-content:center; width:100%; height:100%; color:#6b7280; font-weight:700; }
+        .sel-salon-footer { display:flex; flex-direction:column; align-items:center; gap:8px; }
+        .sel-pisos { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+        .btn-piso { padding:9px 18px; border-radius:10px; border:1px solid #d1d5db; background:#f8f9fb; color:#374151; font-family:inherit; font-size:0.9rem; font-weight:700; cursor:pointer; }
+        .btn-piso.activo { background:var(--color-primario); border-color:var(--color-primario); color:white; }
+        .sel-instruccion { font-size:0.85rem; color:#6b7280; }
+        .sel-tooltip { position:fixed; background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:white; padding:6px 12px; border-radius:8px; font-size:0.85rem; font-weight:700; pointer-events:none; z-index:9999; white-space:nowrap; transform:translate(-50%,calc(-100% - 10px)); }
+      </style>
   </head>
   <body>
     <div id="tostada-contenedor"></div>
@@ -232,6 +259,7 @@
               <button class="boton-filtro" data-dia="Miércoles">Mié</button>
               <button class="boton-filtro" data-dia="Jueves">Jue</button>
               <button class="boton-filtro" data-dia="Viernes">Vie</button>
+              <button class="boton-filtro" data-dia="Sabado">Sáb</button>
             </div>
           </div>
           <div class="contenedor-tabla-simple">
@@ -298,13 +326,7 @@
             </div>
             <div class="campo-formulario oculto" id="inc-salon-container">
               <label>Nuevo Salón</label>
-              <select id="inc-salon-select">
-                <option value="">Seleccionar Salón</option>
-              </select>
-            </div>
-            <div class="campo-formulario">
-              <label>Contexto / Observaciones</label>
-              <textarea id="inc-contexto" rows="3"></textarea>
+              <button type="button" id="inc-salon-btn" class="salon-selector-btn">Salón: —</button>
             </div>
             <div class="acciones-incidencia" style="margin-top:8px;">
               <button type="button" id="btn-codigo-qr" class="boton-secundario oculto">Código QR</button>
@@ -325,6 +347,38 @@
           </button>
         </div>
         <div class="modal-cuerpo" id="cuerpo-modal-codigo-qr"></div>
+      </div>
+    </div>
+
+    <div id="modal-salon" class="modal-overlay">
+      <div class="modal-contenido modal-grande">
+        <div class="modal-cabecera">
+          <h2>Seleccionar Salón</h2>
+          <button id="reg-salon-close" class="boton-icono">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-cuerpo">
+          <div class="salon-container">
+            <div class="salon-container-header">
+              <div style="height:12px;"></div>
+            </div>
+            <div class="sel-salon-layout">
+              <div id="reg-salon-map" class="sel-mapa-contenedor">
+                <div class="sel-cargando">Cargando mapa…</div>
+              </div>
+              <div class="sel-salon-footer">
+                <div class="sel-pisos">
+                  <button type="button" class="btn-piso" data-piso="L">Planta Baja</button>
+                  <button type="button" class="btn-piso" data-piso="1">Piso 1</button>
+                  <button type="button" class="btn-piso" data-piso="2">Piso 2</button>
+                  <button type="button" class="btn-piso" data-piso="3">Piso 3</button>
+                </div>
+                <p class="sel-instruccion">Haz clic en un salón para seleccionarlo</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
