@@ -2186,6 +2186,8 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
   if (historialMes) historialMes.addEventListener('change', actualizarDias);
   if (historialMostrar) historialMostrar.addEventListener('click', cargarHistorial);
 
+  const DIAS_ORDEN = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
   // Renderizar
   const renderizarHorariosJerarquico = () => {
     if (!contenedorHorariosJerarquico) return;
@@ -2207,82 +2209,120 @@ document.addEventListener('DOMContentLoaded', async () => { // namas checa el do
       `;
       headerSemestre.style.cursor = 'pointer';
       
-      const contenedorGrupos = document.createElement('div');
-      contenedorGrupos.className = 'contenedor-grupos-jerarquico';
-      contenedorGrupos.style.display = 'none';
+      const contenedorDias = document.createElement('div');
+      contenedorDias.className = 'contenedor-dias-jerarquico';
+      contenedorDias.style.display = 'none';
 
-      // Agrupar grupos por semestre
       const gruposPorSemestre = grupos.filter(g => g.semestre === semestre).sort((a, b) => a.nombre_grupo.localeCompare(b.nombre_grupo));
 
-      gruposPorSemestre.forEach(grupo => {
-        const divGrupo = document.createElement('div');
-        divGrupo.className = 'item-grupo-jerarquico';
-        
-        const headerGrupo = document.createElement('div');
-        headerGrupo.className = 'header-grupo';
-        headerGrupo.innerHTML = `
-          <span class="material-symbols-outlined">group</span>
-          <span class="texto-grupo">${grupo.nombre_grupo}</span>
+      DIAS_ORDEN.forEach(dia => {
+        let tieneHorarios = false;
+        for (const g of gruposPorSemestre) {
+          if (horario_fijo.some(h => h.id_grupo === g.id_grupo && h.dia === dia)) {
+            tieneHorarios = true;
+            break;
+          }
+        }
+        if (!tieneHorarios) return;
+
+        const divDia = document.createElement('div');
+        divDia.className = 'item-dia-jerarquico';
+
+        const headerDia = document.createElement('div');
+        headerDia.className = 'header-dia';
+        const etiquetaDia = dia === 'Sabado' ? 'Sábado' : dia;
+        headerDia.innerHTML = `
+          <span class="material-symbols-outlined">calendar_today</span>
+          <span class="texto-dia">${etiquetaDia}</span>
           <span class="material-symbols-outlined icono-expandir">expand_more</span>
         `;
-        headerGrupo.style.cursor = 'pointer';
-        
-        const contenedorHorarios = document.createElement('div');
-        contenedorHorarios.className = 'contenedor-horarios-items';
-        contenedorHorarios.style.display = 'none';
+        headerDia.style.cursor = 'pointer';
 
-        // Obtener horarios del grupo
-        const horariosGrupo = horario_fijo.filter(h => h.id_grupo === grupo.id_grupo).sort((a, b) => {
-          const horaA = parseInt(a.hora_inicio.split(':')[0]);
-          const horaB = parseInt(b.hora_inicio.split(':')[0]);
-          return horaA - horaB;
-        });
+        const contenedorGrupos = document.createElement('div');
+        contenedorGrupos.className = 'contenedor-grupos-jerarquico';
+        contenedorGrupos.style.display = 'none';
 
-        horariosGrupo.forEach(horario => {
-          const materia = materias.find(m => m.id_materia === horario.id_materia);
-          const profesor = usuarios.find(u => u.id_usuarios === horario.id_profesor);
-          const profesorAux = usuarios.find(u => u.id_usuarios === horario.id_profesor_aux);
-          const salon = salones.find(s => s.id_salon === horario.id_salon);
-
-          const divHorario = document.createElement('div');
-          divHorario.className = 'item-horario-jerarquico';
-          divHorario.style.cursor = 'pointer';
-          divHorario.innerHTML = `
-            <div class="horario-info">
-              <span class="horario-tiempo">${horario.hora_inicio} - ${horario.hora_fin}</span>
-              <span class="horario-materia">${materia?.nombre_materia || 'Sin materia'}</span>
-              <span class="horario-profesor">${profesor?.nombre || 'Sin profesor'}</span>
-              <span class="horario-salon">${salon?.numero_salon || 'S/N'}</span>
-            </div>
-            <span class="material-symbols-outlined">info</span>
-          `;
-
-          divHorario.addEventListener('click', () => {
-            abrirModalInfo(horario);
+        gruposPorSemestre.forEach(grupo => {
+          const horariosGrupo = horario_fijo.filter(h => h.id_grupo === grupo.id_grupo && h.dia === dia).sort((a, b) => {
+            const horaA = parseInt(a.hora_inicio.split(':')[0]);
+            const horaB = parseInt(b.hora_inicio.split(':')[0]);
+            return horaA - horaB;
           });
 
-          contenedorHorarios.appendChild(divHorario);
+          if (horariosGrupo.length === 0) return;
+
+          const divGrupo = document.createElement('div');
+          divGrupo.className = 'item-grupo-jerarquico';
+          
+          const headerGrupo = document.createElement('div');
+          headerGrupo.className = 'header-grupo';
+          headerGrupo.innerHTML = `
+            <span class="material-symbols-outlined">group</span>
+            <span class="texto-grupo">${grupo.nombre_grupo}</span>
+            <span class="material-symbols-outlined icono-expandir">expand_more</span>
+          `;
+          headerGrupo.style.cursor = 'pointer';
+          
+          const contenedorHorarios = document.createElement('div');
+          contenedorHorarios.className = 'contenedor-horarios-items';
+          contenedorHorarios.style.display = 'none';
+
+          horariosGrupo.forEach(horario => {
+            const materia = materias.find(m => m.id_materia === horario.id_materia);
+            const profesor = usuarios.find(u => u.id_usuarios === horario.id_profesor);
+            const profesorAux = usuarios.find(u => u.id_usuarios === horario.id_profesor_aux);
+            const salon = salones.find(s => s.id_salon === horario.id_salon);
+
+            const divHorario = document.createElement('div');
+            divHorario.className = 'item-horario-jerarquico';
+            divHorario.style.cursor = 'pointer';
+            divHorario.innerHTML = `
+              <div class="horario-info">
+                <span class="horario-tiempo">${horario.hora_inicio} - ${horario.hora_fin}</span>
+                <span class="horario-materia">${materia?.nombre_materia || 'Sin materia'}</span>
+                <span class="horario-profesor">${profesor?.nombre || 'Sin profesor'}</span>
+                <span class="horario-salon">${salon?.numero_salon || 'S/N'}</span>
+              </div>
+              <span class="material-symbols-outlined">info</span>
+            `;
+
+            divHorario.addEventListener('click', () => {
+              abrirModalInfo(horario);
+            });
+
+            contenedorHorarios.appendChild(divHorario);
+          });
+
+          headerGrupo.addEventListener('click', () => {
+            const estaAbierto = contenedorHorarios.style.display !== 'none';
+            contenedorHorarios.style.display = estaAbierto ? 'none' : 'block';
+            headerGrupo.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
+          });
+
+          divGrupo.appendChild(headerGrupo);
+          divGrupo.appendChild(contenedorHorarios);
+          contenedorGrupos.appendChild(divGrupo);
         });
 
-        headerGrupo.addEventListener('click', () => {
-          const estaAbierto = contenedorHorarios.style.display !== 'none';
-          contenedorHorarios.style.display = estaAbierto ? 'none' : 'block';
-          headerGrupo.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
+        headerDia.addEventListener('click', () => {
+          const estaAbierto = contenedorGrupos.style.display !== 'none';
+          contenedorGrupos.style.display = estaAbierto ? 'none' : 'block';
+          headerDia.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
         });
 
-        divGrupo.appendChild(headerGrupo);
-        divGrupo.appendChild(contenedorHorarios);
-        contenedorGrupos.appendChild(divGrupo);
+        divDia.appendChild(headerDia);
+        divDia.appendChild(contenedorGrupos);
+        contenedorDias.appendChild(divDia);
       });
 
       headerSemestre.addEventListener('click', () => {
-        const estaAbierto = contenedorGrupos.style.display !== 'none';
-        contenedorGrupos.style.display = estaAbierto ? 'none' : 'block';
+        const estaAbierto = contenedorDias.style.display !== 'none';
+        contenedorDias.style.display = estaAbierto ? 'none' : 'block';
         headerSemestre.querySelector('.icono-expandir').style.transform = estaAbierto ? 'rotate(0deg)' : 'rotate(180deg)';
       });
 
       divSemestre.appendChild(headerSemestre);
-      divSemestre.appendChild(contenedorGrupos);
+      divSemestre.appendChild(contenedorDias);
       contenedorHorariosJerarquico.appendChild(divSemestre);
     });
   };
